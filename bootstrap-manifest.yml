@@ -56,6 +56,8 @@ governance:
     validation_configurator: scripts/configure-validation.sh
     readiness_checker: scripts/check-governance-readiness.sh
     review_verdict_validator: scripts/validate-review-verdict.sh
+    ai_review_gate: scripts/evaluate-ai-review-gate.sh
+    natural_language_gate_inputs_allowed: false
     validation_adapter_runner: scripts/run-validation-adapter.sh
     sensitive_path_classifier: scripts/classify-sensitive-paths.sh
     repair_decision: scripts/evaluate-repair-decision.sh
