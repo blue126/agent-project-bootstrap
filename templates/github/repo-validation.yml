@@ -1,0 +1,17 @@
+name: Repository validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  repo-validation:
+    uses: blue126/agent-project-bootstrap/.github/workflows/repo-validation.yml@cb1dc39d68ba7475afaa6272882b48b0f87269a9
+    with:
+      pull_request: ${{ github.event.pull_request.number }}
+      base_sha: ${{ github.event.pull_request.base.sha }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
