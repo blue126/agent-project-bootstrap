@@ -1,0 +1,139 @@
+name: Governance contract observe
+
+on:
+  workflow_call:
+    inputs:
+      pull_request:
+        description: Pull request number verified against the GitHub API
+        required: true
+        type: number
+      base_sha:
+        description: Full base commit SHA from the pull request event
+        required: true
+        type: string
+      head_sha:
+        description: Full head commit SHA from the pull request event
+        required: true
+        type: string
+    outputs:
+      validation_ready:
+        description: Whether trusted base configuration has a current adapter binding
+        value: ${{ jobs.observe.outputs.validation_ready }}
+      sensitive_change:
+        description: Whether changed paths match the trusted base policy
+        value: ${{ jobs.observe.outputs.sensitive_change }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  observe:
+    name: observe-only (not a merge gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      validation_ready: ${{ steps.readiness.outputs.ready }}
+      sensitive_change: ${{ steps.classify.outputs.sensitive }}
+    steps:
+      - name: Verify pull request metadata against GitHub
+        id: metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+          EXPECTED_BASE_SHA: ${{ inputs.base_sha }}
+          EXPECTED_HEAD_SHA: ${{ inputs.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "${PULL_REQUEST}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${EXPECTED_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${EXPECTED_HEAD_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          gh api "repos/${REPOSITORY}/pulls/${PULL_REQUEST}" > pull-request.json
+          actual_base="$(jq -r .base.sha pull-request.json)"
+          actual_head="$(jq -r .head.sha pull-request.json)"
+          base_repository="$(jq -r .base.repo.full_name pull-request.json)"
+          head_repository="$(jq -r .head.repo.full_name pull-request.json)"
+          [[ "${actual_base}" == "${EXPECTED_BASE_SHA}" ]]
+          [[ "${actual_head}" == "${EXPECTED_HEAD_SHA}" ]]
+          [[ "${base_repository}" == "${REPOSITORY}" ]]
+          [[ "${head_repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+          echo "head_repository=${head_repository}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out trusted base without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.base_sha }}
+          path: base
+          persist-credentials: false
+
+      - name: Check out untrusted head as data only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ steps.metadata.outputs.head_repository }}
+          ref: ${{ inputs.head_sha }}
+          path: head
+          persist-credentials: false
+
+      - name: Check out the immutable reusable runtime
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: blue126/agent-project-bootstrap
+          ref: ${{ github.workflow_sha }}
+          path: runtime
+          persist-credentials: false
+
+      - name: Verify all checkout identities
+        env:
+          EXPECTED_BASE_SHA: ${{ inputs.base_sha }}
+          EXPECTED_HEAD_SHA: ${{ inputs.head_sha }}
+          EXPECTED_RUNTIME_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$(git -C base rev-parse HEAD)" == "${EXPECTED_BASE_SHA}" ]]
+          [[ "$(git -C head rev-parse HEAD)" == "${EXPECTED_HEAD_SHA}" ]]
+          [[ "$(git -C runtime rev-parse HEAD)" == "${EXPECTED_RUNTIME_SHA}" ]]
+
+      - name: Read changed paths from GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+        run: gh api "repos/${REPOSITORY}/pulls/${PULL_REQUEST}/files" --paginate --jq '.[].filename' > changed-paths.txt
+
+      - name: Classify against trusted base policy
+        id: classify
+        run: |
+          set -euo pipefail
+          policy=base/.agent/governance/sensitive-paths.txt
+          if [[ ! -f "${policy}" ]]; then
+            echo "sensitive=true" >> "${GITHUB_OUTPUT}"
+            echo "Base policy is missing; classification fails closed." >> "${GITHUB_STEP_SUMMARY}"
+          elif runtime/scripts/classify-sensitive-paths.sh --policy "${policy}" < changed-paths.txt > sensitive-paths.txt; then
+            echo "sensitive=true" >> "${GITHUB_OUTPUT}"
+            echo "Governance-sensitive paths changed; human confirmation is required." >> "${GITHUB_STEP_SUMMARY}"
+            sed 's/^/- `/' sensitive-paths.txt | sed 's/$/`/' >> "${GITHUB_STEP_SUMMARY}"
+          else
+            status=$?
+            [[ "${status}" == 1 ]]
+            echo "sensitive=false" >> "${GITHUB_OUTPUT}"
+            echo "No path matched the trusted base sensitive-path policy." >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Report trusted validation readiness
+        id: readiness
+        run: |
+          set -euo pipefail
+          if runtime/scripts/check-governance-readiness.sh --project base > readiness.txt 2>&1; then
+            echo "ready=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "ready=false" >> "${GITHUB_OUTPUT}"
+          fi
+          {
+            echo "### Observe-only governance contract"
+            echo
+            echo "This workflow is not a required merge gate and receives no provider or write credentials."
+            echo
+            sed 's/^/- /' readiness.txt
+          } >> "${GITHUB_STEP_SUMMARY}"
