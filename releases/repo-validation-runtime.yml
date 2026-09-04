@@ -1,0 +1,13 @@
+schema_version: 1
+release: repo-validation-v1
+repository: blue126/agent-project-bootstrap
+commit: cb1dc39d68ba7475afaa6272882b48b0f87269a9
+workflow: .github/workflows/repo-validation.yml
+mode: deterministic_validation
+permissions:
+  contents: read
+  pull_requests: read
+secrets: none
+adapter_control_plane: consumer_base_sha
+head_is_data_only: true
+fail_closed: true

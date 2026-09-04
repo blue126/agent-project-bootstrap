@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/blue126/agent-project-bootstrap/schemas/adapter-catalog.schema.json",
+  "title": "External validation adapter catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "bundled_implementations", "adapters"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "bundled_implementations": {"const": false},
+    "adapters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "upstream", "ref", "license", "supported_stacks", "installation"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+          "upstream": {"type": "string", "format": "uri"},
+          "ref": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "license": {"type": "string", "minLength": 1},
+          "supported_stacks": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "installation": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

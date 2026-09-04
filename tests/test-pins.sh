@@ -79,4 +79,9 @@ assert_contains "${repo_root}/templates/github/governance-observe.yml" "governan
 assert_contains "${repo_root}/releases/governance-runtime.yml" "commit: ${observe_sha}"
 assert_contains "${repo_root}/releases/governance-runtime.yml" 'required_gate: false'
 
+validation_sha="$(awk '$1 == "commit:" { print $2; exit }' "${repo_root}/releases/repo-validation-runtime.yml")"
+[[ "${validation_sha}" =~ ^[0-9a-f]{40}$ ]] || { echo "Validation runtime is not pinned to a full SHA" >&2; exit 1; }
+assert_contains "${repo_root}/templates/github/repo-validation.yml" "repo-validation.yml@${validation_sha}"
+assert_contains "${repo_root}/scripts/install-repo-validation-caller.sh" "runtime_sha=\"${validation_sha}\""
+
 echo "pin consistency tests passed"
