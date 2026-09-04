@@ -37,6 +37,8 @@ governance:
   providers:
     reviewer_default: none
     fixer_default: none
+    config_schema: schemas/provider-config.schema.json
+    secrets_inherit_allowed: false
   validation_adapter:
     contract_schema: schemas/validation-adapter.schema.json
     result_schema: schemas/validation-result.schema.json
