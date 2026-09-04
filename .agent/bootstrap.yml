@@ -1,0 +1,20 @@
+schema_version: 4
+source: blue126/agent-project-bootstrap
+workflow_id: github-workflow
+governance:
+  reviewer: none
+  fixer: none
+  validation: pending
+  validation_mode: review_only
+  validation_adapter_manifest: none
+  validation_adapter_sha256: none
+  auto_merge: disabled
+  sensitive_paths: .agent/governance/sensitive-paths.txt
+  runtime_sha: 20ae04d640f252201e660db977a43a41f4bfccb0
+components:
+  curated_skills: skip
+  workflow_pack: github-workflow
+  governance_observe: install
+managed_files:
+  .github/workflows/agent-governance-observe.yml: 3d5e1febe030ebdd7abbb57c656628c68be562a3c74aadcf073adc2e91f31fa6
+  .agent/governance/sensitive-paths.txt: e289621129b069702a36be2aa0b1d9d87530e68e12c7a8ca6a24bea452c3a0c7

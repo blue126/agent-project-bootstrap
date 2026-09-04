@@ -1,0 +1,14 @@
+# Public defaults. Consumers may add patterns but a pull request cannot reduce
+# the base branch policy that classifies that same pull request.
+.github/workflows/**
+github/rulesets/**
+.agent/bootstrap.yml
+.agent/governance/**
+.agent/validation/**
+**/*ruleset*
+**/*permission*
+**/*secret*
+**/*credential*
+**/*deploy*
+**/*release*
+**/*external-write*
