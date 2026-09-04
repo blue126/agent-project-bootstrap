@@ -1,0 +1,54 @@
+skills:
+  - name: rf-first-principles
+    destination: skills/rf-first-principles
+    repo: wangruofeng/meta-skill
+    path: skills/rf-first-principles
+    ref: 6b5fe52e10289bc974ac42ae0e9ae4b52992d077
+    license: MIT
+    copyright: Copyright (c) 2026 wangruofeng
+    modifications:
+      - Copied the upstream root MIT license into the distributable directory.
+
+  - name: rf-adversarial-review
+    destination: skills/rf-adversarial-review
+    repo: wangruofeng/meta-skill
+    path: skills/rf-adversarial-review
+    ref: 6b5fe52e10289bc974ac42ae0e9ae4b52992d077
+    license: MIT
+    copyright: Copyright (c) 2026 wangruofeng
+    modifications:
+      - Copied the upstream root MIT license into the distributable directory.
+
+  - name: pre-mortem
+    destination: skills/pre-mortem
+    repo: borghei/Claude-Skills
+    path: project-management/discovery/pre-mortem
+    ref: ddca910e95580c63a236303fc1534054f0f14d4c
+    license: MIT + Commons Clause
+    distribution_policy: bundled_with_restriction
+    maintainer_acceptance: explicit-2026-09-04
+    copyright: Copyright (c) 2025-2026 Amin Borghei
+    modifications:
+      - Renamed the installer alias premortem to match the upstream Skill name.
+      - Replaced broken example links to unavailable sibling Skills with plain references.
+      - Copied the complete upstream license into the distributable directory.
+
+  - name: thinking-toolkit
+    destination: skills/thinking-toolkit
+    repo: ponomr/thinking-toolkit
+    path: .
+    ref: ef1ad45b707732a5459e593bce5de7abb496e91f
+    license: MIT
+    copyright: Copyright (c) 2026 Aleksei Ponomar
+    modifications:
+      - Included only SKILL.md, references, logic, agents, and LICENSE.
+      - Excluded upstream repository tooling, tests, install script, and nonessential assets.
+
+external_catalog:
+  - id: human-3-development-assessor
+    upstream: https://github.com/chengjialu8888/Human-3.0
+    availability: private_only
+    license: undeclared
+    bundled: false
+    automated: false
+    action: Visit upstream

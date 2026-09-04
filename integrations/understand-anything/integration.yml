@@ -1,0 +1,28 @@
+schema_version: 1
+name: understand-anything
+kind: managed-upstream
+upstream: https://github.com/Egonex-AI/Understand-Anything
+fork: false
+license: MIT
+known_good:
+  tag: v2.9.0
+  ref: f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8
+update_policy:
+  mode: tracked-pinned
+  promotion: manual-after-security-and-compatibility-validation
+  floating_refs_allowed: false
+activation:
+  opt_in: true
+  scope: project
+installation:
+  default_flow: prompt
+  user_level_writes_allowed: false
+  runtime_path: .agent/runtime/understand-anything/repo
+  skills_path: .agents/skills
+  installer: scripts/install-understand-anything.sh
+  local_patches:
+    - patches/project-scope-and-git-hardening.patch
+security:
+  trust_boundary: analyze-trusted-repositories-only
+  upstream_issue: https://github.com/Egonex-AI/Understand-Anything/issues/656
+  local_hardening: validate graph commit refs before git diff

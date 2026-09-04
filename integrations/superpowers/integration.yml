@@ -1,0 +1,24 @@
+schema_version: 1
+name: superpowers
+kind: managed-upstream
+upstream: https://github.com/obra/superpowers
+fork: false
+known_good:
+  tag: v6.3.0
+  ref: b36e0829c6d0140e93cfef2ca599b1b07d4a7797
+update_policy:
+  mode: tracked-pinned
+  check: latest-stable-release
+  promotion: manual-after-compatibility-validation
+  floating_refs_allowed: false
+activation:
+  opt_in: true
+  workflow_id: superpowers
+  mutually_exclusive_with:
+    - github-workflow
+installation:
+  explicit_opt_in: true
+  bulk_install_on_bootstrap: false
+  requires_scope_and_target_agent: true
+  installer: npx skills@1.5.23 add https://github.com/obra/superpowers/tree/v6.3.0
+  interactive: true

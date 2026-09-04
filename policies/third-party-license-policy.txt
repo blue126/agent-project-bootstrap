@@ -1,0 +1,6 @@
+# Exact license labels approved for bundled third-party content.
+MIT
+
+# Explicit maintainer decision recorded 2026-09-04. This restriction remains
+# fully applicable and must be prominent in THIRD_PARTY_NOTICES.md.
+MIT + Commons Clause

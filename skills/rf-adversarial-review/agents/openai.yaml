@@ -1,0 +1,7 @@
+interface:
+  display_name: "RF Adversarial Review"
+  short_description: "显式调用的对抗式审查与攻击向量验证"
+  default_prompt: "Use $rf-adversarial-review to attack-test this target and report verified weaknesses."
+
+policy:
+  allow_implicit_invocation: false

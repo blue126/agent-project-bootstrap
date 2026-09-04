@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/blue126/agent-project-bootstrap/schemas/review-verdict.schema.json",
+  "title": "Agent governance review verdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["repository", "pull_request", "reviewed_sha", "status", "findings"],
+  "properties": {
+    "repository": {
+      "type": "string",
+      "pattern": "^[^/\\s]+/[^/\\s]+$"
+    },
+    "pull_request": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reviewed_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "status": {
+      "enum": ["pass", "needs_fix", "human_required"]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fingerprint", "severity", "actionable", "path", "summary"],
+        "properties": {
+          "fingerprint": {"type": "string", "minLength": 1, "maxLength": 256},
+          "severity": {"enum": ["blocking", "non_blocking"]},
+          "actionable": {"type": "boolean"},
+          "path": {"type": "string", "minLength": 1},
+          "summary": {"type": "string", "minLength": 1, "maxLength": 2000}
+        }
+      }
+    }
+  }
+}

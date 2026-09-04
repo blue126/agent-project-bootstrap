@@ -1,0 +1,114 @@
+schema_version: 4
+name: agent-project-bootstrap
+source_repository: blue126/agent-project-bootstrap
+
+# Bootstrap records a hash of every project file it writes in the target's
+# .agent/bootstrap.yml. --update replaces only files still matching that hash;
+# anything you edited is preserved unless --force is given.
+project_files:
+  - source: templates/AGENTS.md
+    destination: AGENTS.md
+  - source: templates/CLAUDE.md
+    destination: CLAUDE.md
+  - source: policies/core.md
+    destination: .agent/policies/core.md
+  - source: policies/git.md
+    destination: .agent/policies/git.md
+  - source: policies/workflow-selection.md
+    destination: .agent/policies/workflow-selection.md
+  - source: templates/runtime.gitignore
+    destination: .agent/runtime/.gitignore
+  - source: templates/skills.gitignore
+    destination: .agents/skills/.gitignore
+  - source: templates/sensitive-paths.txt
+    destination: .agent/governance/sensitive-paths.txt
+
+governance:
+  lifecycle:
+    initial_validation: pending
+    allowed_validation_states:
+      - pending
+      - configured
+    allowed_validation_modes:
+      - review_only
+      - shadow
+      - enforced
+    auto_merge_when_pending: false
+  providers:
+    reviewer_default: none
+    fixer_default: none
+  validation_adapter:
+    contract_schema: schemas/validation-adapter.schema.json
+    result_schema: schemas/validation-result.schema.json
+    bundled_implementations: false
+    missing_or_invalid: fail_closed
+  review_verdict:
+    schema: schemas/review-verdict.schema.json
+    natural_language_is_gate_input: false
+  sensitive_paths:
+    source: templates/sensitive-paths.txt
+    consumer_may_extend: true
+  contract_tools:
+    validation_configurator: scripts/configure-validation.sh
+    readiness_checker: scripts/check-governance-readiness.sh
+    review_verdict_validator: scripts/validate-review-verdict.sh
+    validation_adapter_runner: scripts/run-validation-adapter.sh
+    sensitive_path_classifier: scripts/classify-sensitive-paths.sh
+
+skills:
+  label: Curated Skills
+  installer: npx skills@1.5.23 add <path-to-this-checkout>
+  cli_version: 1.5.23
+  install_from: local_checkout
+  interactive: true
+  default: prompt
+  non_interactive_requires_explicit_choice: true
+  # Project paths the installer writes to, per agent. .agents/skills is shared
+  # by Codex, OpenCode and Cursor; Claude Code uses its own directory.
+  supported_agents:
+    - name: codex
+      project_path: .agents/skills
+      user_path: ~/.codex/skills
+    - name: opencode
+      project_path: .agents/skills
+      user_path: ~/.config/opencode/skills
+    - name: claude-code
+      project_path: .claude/skills
+      user_path: ~/.claude/skills
+
+workflows:
+  default: prompt
+  allowed:
+    - none
+    - github-workflow
+    - superpowers
+  mutually_exclusive: true
+  explicit_opt_in: true
+  installation_may_coexist: true
+  activation_is_separate_from_installation: true
+  standard_installation_follows_active_workflow: true
+  parallel_workflow_pack_installation: explicit_only
+
+integrations:
+  - name: understand-anything
+    manifest: integrations/understand-anything/integration.yml
+    installation_default: prompt
+    scope: project
+  - name: superpowers
+    manifest: integrations/superpowers/integration.yml
+    installation_default: when_workflow_selected
+
+github:
+  repository_creation:
+    opt_in: true
+    repository_must_be_explicit: true
+    visibility_must_be_explicit: true
+    creates_initial_commit: true
+    pushes_main: true
+  remote_configuration:
+    opt_in: true
+    repository_must_be_explicit: true
+  rulesets:
+    - name: Protect main
+      source: github/rulesets/protect-main.json
+      target: refs/heads/main

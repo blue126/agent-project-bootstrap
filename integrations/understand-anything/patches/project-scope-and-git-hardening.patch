@@ -1,0 +1,55 @@
+diff --git a/understand-anything-plugin/hooks/auto-update-prompt.md b/understand-anything-plugin/hooks/auto-update-prompt.md
+index cdc5800..668c128 100644
+--- a/understand-anything-plugin/hooks/auto-update-prompt.md
++++ b/understand-anything-plugin/hooks/auto-update-prompt.md
+@@ -28 +28,2 @@ Incrementally update the knowledge graph using deterministic structural fingerpr
+-   git diff "<lastCommitHash>..HEAD" --name-only
++   GRAPH_COMMIT=$(git rev-parse --verify --end-of-options "<lastCommitHash>^{commit}" 2>/dev/null)
++   git diff --name-only "$GRAPH_COMMIT" HEAD -- .
+diff --git a/understand-anything-plugin/packages/core/src/staleness.ts b/understand-anything-plugin/packages/core/src/staleness.ts
+index 0750ba3..4ac1f05 100644
+--- a/understand-anything-plugin/packages/core/src/staleness.ts
++++ b/understand-anything-plugin/packages/core/src/staleness.ts
+@@ -18 +18,6 @@ export function getChangedFiles(
+-    const output = execFileSync('git', ['diff', `${lastCommitHash}..HEAD`, '--name-only'], {
++    const commit = execFileSync(
++      "git",
++      ["rev-parse", "--verify", "--end-of-options", `${lastCommitHash}^{commit}`],
++      { cwd: projectDir, encoding: "utf-8" },
++    ).trim();
++    const output = execFileSync("git", ["diff", "--name-only", commit, "HEAD", "--", "."], {
+diff --git a/understand-anything-plugin/skills/understand-dashboard/SKILL.md b/understand-anything-plugin/skills/understand-dashboard/SKILL.md
+index 3aa8398..2980107 100644
+--- a/understand-anything-plugin/skills/understand-dashboard/SKILL.md
++++ b/understand-anything-plugin/skills/understand-dashboard/SKILL.md
+@@ -34,0 +35,2 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
++   PROJECT_SKILL_REAL=$(realpath "$PROJECT_DIR/.agents/skills/understand-dashboard" 2>/dev/null || readlink -f "$PROJECT_DIR/.agents/skills/understand-dashboard" 2>/dev/null || echo "")
++   PROJECT_SELF_RELATIVE=$([ -n "$PROJECT_SKILL_REAL" ] && cd "$PROJECT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
+@@ -42,0 +45 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
++     "$PROJECT_SELF_RELATIVE" \
+diff --git a/understand-anything-plugin/skills/understand-domain/SKILL.md b/understand-anything-plugin/skills/understand-domain/SKILL.md
+index 702ecf1..5302b24 100644
+--- a/understand-anything-plugin/skills/understand-domain/SKILL.md
++++ b/understand-anything-plugin/skills/understand-domain/SKILL.md
+@@ -55,0 +56,2 @@ Resolve the plugin root like this:
++PROJECT_SKILL_REAL=$(realpath "$PROJECT_ROOT/.agents/skills/understand-domain" 2>/dev/null || readlink -f "$PROJECT_ROOT/.agents/skills/understand-domain" 2>/dev/null || echo "")
++PROJECT_SELF_RELATIVE=$([ -n "$PROJECT_SKILL_REAL" ] && cd "$PROJECT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
+@@ -63,0 +66 @@ for candidate in \
++  "$PROJECT_SELF_RELATIVE" \
+diff --git a/understand-anything-plugin/skills/understand/SKILL.md b/understand-anything-plugin/skills/understand/SKILL.md
+index 99bede1..e22b623 100644
+--- a/understand-anything-plugin/skills/understand/SKILL.md
++++ b/understand-anything-plugin/skills/understand/SKILL.md
+@@ -79,0 +80,2 @@ Determine whether to run a full analysis or incremental update.
++   PROJECT_SKILL_REAL=$(realpath "$PROJECT_ROOT/.agents/skills/understand" 2>/dev/null || readlink -f "$PROJECT_ROOT/.agents/skills/understand" 2>/dev/null || echo "")
++   PROJECT_SELF_RELATIVE=$([ -n "$PROJECT_SKILL_REAL" ] && cd "$PROJECT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
+@@ -87,0 +90 @@ Determine whether to run a full analysis or incremental update.
++     "$PROJECT_SELF_RELATIVE" \
+@@ -188 +191,2 @@ Determine whether to run a full analysis or incremental update.
+-   git diff <lastCommitHash>..HEAD --name-only
++   GRAPH_COMMIT=$(git rev-parse --verify --end-of-options "<lastCommitHash>^{commit}" 2>/dev/null)
++   git diff --name-only "$GRAPH_COMMIT" HEAD -- .
+@@ -355 +359,2 @@ Write the changed-files list (one path per line) to a temp file:
+-git diff "<lastCommitHash>..HEAD" --name-only > "$UA_DIR/tmp/changed-files.txt"
++GRAPH_COMMIT=$(git rev-parse --verify --end-of-options "<lastCommitHash>^{commit}" 2>/dev/null)
++git diff --name-only "$GRAPH_COMMIT" HEAD -- . > "$UA_DIR/tmp/changed-files.txt"
