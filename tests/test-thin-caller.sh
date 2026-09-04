@@ -22,6 +22,8 @@ if grep -Eq '(secrets:|pull_request_target|write)' "${caller}"; then
   echo "thin caller unexpectedly contains secrets, a privileged trigger, or write access" >&2
   exit 1
 fi
+grep -q 'cancel-in-progress: true' "${caller}"
+grep -q 'github.event.pull_request.number' "${caller}"
 
 # Untouched managed callers upgrade; consumer-edited callers are preserved.
 echo '# released update' >> "${distribution}/templates/github/governance-observe.yml"

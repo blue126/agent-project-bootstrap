@@ -8,6 +8,10 @@ permissions:
   contents: read
   pull-requests: read
 
+concurrency:
+  group: agent-governance-observe-${{ github.repository }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   governance-observe:
     uses: blue126/agent-project-bootstrap/.github/workflows/governance-observe.yml@20ae04d640f252201e660db977a43a41f4bfccb0
