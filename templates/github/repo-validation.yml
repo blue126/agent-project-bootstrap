@@ -8,6 +8,10 @@ permissions:
   contents: read
   pull-requests: read
 
+concurrency:
+  group: repo-validation-${{ github.repository }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   repo-validation:
     uses: blue126/agent-project-bootstrap/.github/workflows/repo-validation.yml@cb1dc39d68ba7475afaa6272882b48b0f87269a9

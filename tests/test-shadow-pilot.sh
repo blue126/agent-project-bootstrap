@@ -8,6 +8,7 @@ grep -q '^  validation_mode: review_only$' "${repo_root}/.agent/bootstrap.yml"
 grep -q '^  auto_merge: disabled$' "${repo_root}/.agent/bootstrap.yml"
 grep -q 'governance-observe.yml@20ae04d640f252201e660db977a43a41f4bfccb0' \
   "${repo_root}/.github/workflows/agent-governance-observe.yml"
+grep -q 'cancel-in-progress: true' "${repo_root}/.github/workflows/agent-governance-observe.yml"
 
 if "${repo_root}/scripts/check-governance-readiness.sh" --project "${repo_root}" >/dev/null 2>&1; then
   echo "pending shadow pilot unexpectedly reported validation ready" >&2

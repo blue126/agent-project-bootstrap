@@ -29,6 +29,8 @@ EOF
 caller="${project}/.github/workflows/repo-validation.yml"
 test -s "${caller}"
 grep -q 'repo-validation.yml@cb1dc39d68ba7475afaa6272882b48b0f87269a9' "${caller}"
+grep -q 'cancel-in-progress: true' "${caller}"
+grep -q 'github.event.pull_request.number' "${caller}"
 grep -q '^  repo_validation_runtime_sha: cb1dc39d68ba7475afaa6272882b48b0f87269a9$' "${project}/.agent/bootstrap.yml"
 grep -q '^  repo_validation: install$' "${project}/.agent/bootstrap.yml"
 grep -q '^  .github/workflows/repo-validation.yml: [0-9a-f]\{64\}$' "${project}/.agent/bootstrap.yml"
