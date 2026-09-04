@@ -29,5 +29,7 @@ grep -q 'github-workflow is active but Curated Skills installation was skipped' 
 grep -q 'initial_validation: pending' "${repo_root}/bootstrap-manifest.yml"
 grep -q 'auto_merge_when_pending: false' "${repo_root}/bootstrap-manifest.yml"
 grep -q 'bundled_implementations: false' "${repo_root}/bootstrap-manifest.yml"
+grep -q '"required_review_thread_resolution": true' "${repo_root}/github/rulesets/protect-main.json"
+grep -q '"squash"' "${repo_root}/github/rulesets/protect-main.json"
 
 echo "policy text tests passed"

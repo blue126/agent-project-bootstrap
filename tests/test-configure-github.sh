@@ -29,15 +29,17 @@ fi
 if [[ "${arguments}" == *" repos/acme/project/rulesets --paginate "* ]]; then
   case "${MOCK_SCENARIO}" in
     create|missing-main) ;;
-    same|update|param-drift) echo 42 ;;
+    same|update|param-drift|merge-method-drift) echo 42 ;;
   esac
   exit 0
 fi
 if [[ "${arguments}" == *" repos/acme/project/rulesets/42 "* && "${arguments}" != *" --method PUT "* ]]; then
   if [[ "${MOCK_SCENARIO}" == same ]]; then
-    jq '.rules[1].parameters.allowed_merge_methods = ["merge", "squash", "rebase"] | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
+    jq '. + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
   elif [[ "${MOCK_SCENARIO}" == param-drift ]]; then
     jq '(.rules[] | select(.type == "non_fast_forward")) |= (. + {parameters: {tampered: true}}) | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
+  elif [[ "${MOCK_SCENARIO}" == merge-method-drift ]]; then
+    jq '(.rules[] | select(.type == "pull_request").parameters.allowed_merge_methods) = ["merge", "squash", "rebase"] | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
   else
     jq '.enforcement = "disabled" | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
   fi
@@ -84,6 +86,10 @@ grep -q 'Updated active Protect main' "${test_root}/update.out"
 run_scenario param-drift
 grep -q -- '--method PUT' "${test_root}/param-drift.log"
 grep -q 'Updated active Protect main' "${test_root}/param-drift.out"
+
+run_scenario merge-method-drift
+grep -q -- '--method PUT' "${test_root}/merge-method-drift.log"
+grep -q 'Updated active Protect main' "${test_root}/merge-method-drift.out"
 
 if PATH="${mock_bin}:${PATH}" \
   MOCK_SCENARIO=missing-main \

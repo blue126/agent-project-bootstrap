@@ -103,8 +103,6 @@ normalize_ruleset() {
       rules: [
         .rules[] |
         if .type == "pull_request" then
-          # allowed_merge_methods is dropped on purpose: GitHub returns a
-          # default the payload does not set, which would report drift forever.
           {
             type,
             parameters: {
@@ -112,7 +110,8 @@ normalize_ruleset() {
               require_code_owner_review: .parameters.require_code_owner_review,
               require_last_push_approval: .parameters.require_last_push_approval,
               required_approving_review_count: .parameters.required_approving_review_count,
-              required_review_thread_resolution: .parameters.required_review_thread_resolution
+              required_review_thread_resolution: .parameters.required_review_thread_resolution,
+              allowed_merge_methods: (.parameters.allowed_merge_methods | sort)
             }
           }
         else
