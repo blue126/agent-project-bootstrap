@@ -66,6 +66,8 @@ governance:
     thin_caller_template: templates/github/governance-observe.yml
     installation: explicit_opt_in
     required_gate_available: false
+    repo_validation_runtime: .github/workflows/repo-validation.yml
+    repo_validation_gate_available: true
 
 skills:
   label: Curated Skills

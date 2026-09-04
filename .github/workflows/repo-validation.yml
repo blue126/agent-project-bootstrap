@@ -1,0 +1,108 @@
+name: Repository validation gate
+
+on:
+  workflow_call:
+    inputs:
+      pull_request:
+        required: true
+        type: number
+      base_sha:
+        required: true
+        type: string
+      head_sha:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  repo-validation:
+    name: repo-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Verify pull request metadata against GitHub
+        id: metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+          EXPECTED_BASE_SHA: ${{ inputs.base_sha }}
+          EXPECTED_HEAD_SHA: ${{ inputs.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ "${PULL_REQUEST}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${EXPECTED_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${EXPECTED_HEAD_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          gh api "repos/${REPOSITORY}/pulls/${PULL_REQUEST}" > pull-request.json
+          [[ "$(jq -r .base.sha pull-request.json)" == "${EXPECTED_BASE_SHA}" ]]
+          [[ "$(jq -r .head.sha pull-request.json)" == "${EXPECTED_HEAD_SHA}" ]]
+          [[ "$(jq -r .base.repo.full_name pull-request.json)" == "${REPOSITORY}" ]]
+          head_repository="$(jq -r .head.repo.full_name pull-request.json)"
+          [[ "${head_repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+          echo "head_repository=${head_repository}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out trusted base control plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.base_sha }}
+          path: base
+          persist-credentials: false
+
+      - name: Check out untrusted head data plane
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ steps.metadata.outputs.head_repository }}
+          ref: ${{ inputs.head_sha }}
+          path: head
+          persist-credentials: false
+
+      - name: Check out immutable validation runtime
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: blue126/agent-project-bootstrap
+          ref: ${{ github.workflow_sha }}
+          path: runtime
+          persist-credentials: false
+
+      - name: Verify checkout provenance
+        env:
+          EXPECTED_BASE_SHA: ${{ inputs.base_sha }}
+          EXPECTED_HEAD_SHA: ${{ inputs.head_sha }}
+          EXPECTED_RUNTIME_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$(git -C base rev-parse HEAD)" == "${EXPECTED_BASE_SHA}" ]]
+          [[ "$(git -C head rev-parse HEAD)" == "${EXPECTED_HEAD_SHA}" ]]
+          [[ "$(git -C runtime rev-parse HEAD)" == "${EXPECTED_RUNTIME_SHA}" ]]
+
+      - name: Require a current trusted adapter binding
+        run: runtime/scripts/check-governance-readiness.sh --project base
+
+      - name: Run trusted adapter against untrusted head
+        env:
+          REPOSITORY: ${{ github.repository }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+          BASE_SHA: ${{ inputs.base_sha }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+        run: |
+          set -euo pipefail
+          manifest="$(awk '/^  validation_adapter_manifest:/ { print $2; exit }' base/.agent/bootstrap.yml)"
+          manifest_sha="$(awk '/^  validation_adapter_sha256:/ { print $2; exit }' base/.agent/bootstrap.yml)"
+          runtime/scripts/run-validation-adapter.sh \
+            --adapter-root base \
+            --manifest "base/${manifest}" \
+            --workspace head \
+            --repo "${REPOSITORY}" \
+            --pr "${PULL_REQUEST}" \
+            --base-sha "${BASE_SHA}" \
+            --head-sha "${HEAD_SHA}" \
+            --expected-manifest-sha "${manifest_sha}" > validation-result.json
+          {
+            echo '### Repository validation'
+            echo
+            jq -r '"- Adapter: `\(.adapter.id)@\(.adapter.version)`\n- Validated SHA: `\(.validated_sha)`\n- Status: **\(.status)**\n- Summary: \(.summary)"' validation-result.json
+          } >> "${GITHUB_STEP_SUMMARY}"
