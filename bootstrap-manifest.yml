@@ -54,6 +54,9 @@ governance:
     review_verdict_validator: scripts/validate-review-verdict.sh
     validation_adapter_runner: scripts/run-validation-adapter.sh
     sensitive_path_classifier: scripts/classify-sensitive-paths.sh
+  reusable_workflows:
+    observe_only: .github/workflows/governance-observe.yml
+    required_gate_available: false
 
 skills:
   label: Curated Skills
