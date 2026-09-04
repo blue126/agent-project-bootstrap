@@ -56,6 +56,9 @@ governance:
     review_verdict_validator: scripts/validate-review-verdict.sh
     validation_adapter_runner: scripts/run-validation-adapter.sh
     sensitive_path_classifier: scripts/classify-sensitive-paths.sh
+    repair_decision: scripts/evaluate-repair-decision.sh
+    repair_max_rounds: 3
+    repair_initial_rollout_rounds: 1
   reusable_workflows:
     observe_only: .github/workflows/governance-observe.yml
     observe_release_sha: 20ae04d640f252201e660db977a43a41f4bfccb0
