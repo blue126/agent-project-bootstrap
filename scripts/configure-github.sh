@@ -11,8 +11,8 @@ usage() {
   cat <<'EOF'
 Usage: scripts/configure-github.sh --repo OWNER/REPOSITORY [--enforcement active|evaluate|disabled]
 
-Create or reconcile the repository-level "Protect main" ruleset.
-Requires authenticated gh, jq, an existing main branch, and permission to edit repository rules.
+Create or reconcile the repository-level "Protect main" ruleset against the
+verified GitHub default branch. Requires authenticated gh, jq, git, and permission to edit repository rules.
 EOF
 }
 
@@ -46,7 +46,7 @@ if [[ ! "${repository}" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
 fi
 case "${enforcement}" in active|evaluate|disabled) ;; *) echo "Invalid --enforcement value" >&2; exit 2 ;; esac
 
-for command_name in gh jq; do
+for command_name in gh jq git; do
   command -v "${command_name}" >/dev/null 2>&1 || {
     echo "${command_name} is required" >&2
     exit 1
@@ -60,7 +60,6 @@ current_file="$(mktemp)"
 desired_file="$(mktemp)"
 cleanup() { rm -f "${rendered_ruleset}" "${current_file}" "${desired_file}"; }
 trap cleanup EXIT
-jq --arg enforcement "${enforcement}" '.enforcement = $enforcement' "${ruleset_file}" > "${rendered_ruleset}"
 
 api() {
   gh api \
@@ -69,10 +68,21 @@ api() {
     "$@"
 }
 
-if ! api "repos/${repository}/git/ref/heads/main" >/dev/null 2>&1; then
-  echo "refs/heads/main must exist before enabling Protect main" >&2
+default_branch="$(api "repos/${repository}" --jq .default_branch)"
+[[ -n "${default_branch}" ]] || { echo "GitHub repository has no default branch" >&2; exit 1; }
+git check-ref-format --branch "${default_branch}" >/dev/null 2>&1 || {
+  echo "GitHub returned an invalid default branch name" >&2
+  exit 1
+}
+if ! api "repos/${repository}/git/ref/heads/${default_branch}" >/dev/null 2>&1; then
+  echo "Verified default branch refs/heads/${default_branch} does not exist" >&2
   exit 1
 fi
+jq \
+  --arg enforcement "${enforcement}" \
+  --arg default_ref "refs/heads/${default_branch}" \
+  '.enforcement = $enforcement | .conditions.ref_name.include = [$default_ref]' \
+  "${ruleset_file}" > "${rendered_ruleset}"
 
 ruleset_ids="$(
   api "repos/${repository}/rulesets" --paginate \

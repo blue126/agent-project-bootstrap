@@ -22,7 +22,11 @@ if [[ "${arguments}" == *" repos/acme/project --jq .permissions.admin // false "
   echo "configure-github must not require full repository admin permission" >&2
   exit 1
 fi
-if [[ "${arguments}" == *" repos/acme/project/git/ref/heads/main "* ]]; then
+if [[ "${arguments}" == *" repos/acme/project --jq .default_branch "* ]]; then
+  echo trunk
+  exit 0
+fi
+if [[ "${arguments}" == *" repos/acme/project/git/ref/heads/trunk "* ]]; then
   [[ "${MOCK_SCENARIO}" != missing-main ]]
   exit $?
 fi
@@ -35,25 +39,28 @@ if [[ "${arguments}" == *" repos/acme/project/rulesets --paginate "* ]]; then
 fi
 if [[ "${arguments}" == *" repos/acme/project/rulesets/42 "* && "${arguments}" != *" --method PUT "* ]]; then
   if [[ "${MOCK_SCENARIO}" == same ]]; then
-    jq '. + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
+    jq '.conditions.ref_name.include = ["refs/heads/trunk"] | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
   elif [[ "${MOCK_SCENARIO}" == param-drift ]]; then
-    jq '(.rules[] | select(.type == "non_fast_forward")) |= (. + {parameters: {tampered: true}}) | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
+    jq '.conditions.ref_name.include = ["refs/heads/trunk"] | (.rules[] | select(.type == "non_fast_forward")) |= (. + {parameters: {tampered: true}}) | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
   elif [[ "${MOCK_SCENARIO}" == merge-method-drift ]]; then
-    jq '(.rules[] | select(.type == "pull_request").parameters.allowed_merge_methods) = ["merge", "squash", "rebase"] | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
+    jq '.conditions.ref_name.include = ["refs/heads/trunk"] | (.rules[] | select(.type == "pull_request").parameters.allowed_merge_methods) = ["merge", "squash", "rebase"] | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
   else
-    jq '.enforcement = "disabled" | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
+    jq '.conditions.ref_name.include = ["refs/heads/trunk"] | .enforcement = "disabled" | . + {id: 42, source_type: "Repository"}' "${MOCK_RULESET_FILE}"
   fi
   exit 0
 fi
 if [[ "${arguments}" == *" --method POST "* || "${arguments}" == *" --method PUT "* ]]; then
-  if [[ "${MOCK_SCENARIO}" == evaluate ]]; then
+  if [[ "${MOCK_SCENARIO}" == evaluate || "${MOCK_SCENARIO}" == create ]]; then
     input_file=""
     previous=""
     for argument in "$@"; do
       [[ "${previous}" == --input ]] && input_file="${argument}"
       previous="${argument}"
     done
-    jq -e '.enforcement == "evaluate"' "${input_file}" >/dev/null
+    if [[ "${MOCK_SCENARIO}" == evaluate ]]; then
+      jq -e '.enforcement == "evaluate"' "${input_file}" >/dev/null
+    fi
+    jq -e '.conditions.ref_name.include == ["refs/heads/trunk"]' "${input_file}" >/dev/null
   fi
   exit 0
 fi
@@ -122,7 +129,7 @@ if PATH="${mock_bin}:${PATH}" \
   MOCK_GH_LOG="${test_root}/missing-main.log" \
   MOCK_RULESET_FILE="${repo_root}/github/rulesets/protect-main.json" \
   "${repo_root}/scripts/configure-github.sh" --repo acme/project >/dev/null 2>&1; then
-  echo "missing main unexpectedly succeeded" >&2
+  echo "missing verified default branch unexpectedly succeeded" >&2
   exit 1
 fi
 
