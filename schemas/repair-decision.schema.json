@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/blue126/agent-project-bootstrap/schemas/repair-decision.schema.json",
+  "title": "Deterministic repair-loop decision input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "round", "previous_fingerprints", "findings", "validation_passed",
+    "permission_ok", "conflict", "sensitive", "ambiguous", "architectural"
+  ],
+  "properties": {
+    "round": {"type": "integer", "minimum": 0},
+    "previous_fingerprints": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fingerprint", "severity", "actionable"],
+        "properties": {
+          "fingerprint": {"type": "string", "minLength": 1},
+          "severity": {"enum": ["blocking", "non_blocking"]},
+          "actionable": {"type": "boolean"}
+        }
+      }
+    },
+    "validation_passed": {"type": "boolean"},
+    "permission_ok": {"type": "boolean"},
+    "conflict": {"type": "boolean"},
+    "sensitive": {"type": "boolean"},
+    "ambiguous": {"type": "boolean"},
+    "architectural": {"type": "boolean"}
+  }
+}
