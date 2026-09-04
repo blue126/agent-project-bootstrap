@@ -1,0 +1,17 @@
+name: Agent governance observe
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  governance-observe:
+    uses: blue126/agent-project-bootstrap/.github/workflows/governance-observe.yml@20ae04d640f252201e660db977a43a41f4bfccb0
+    with:
+      pull_request: ${{ github.event.pull_request.number }}
+      base_sha: ${{ github.event.pull_request.base.sha }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
