@@ -29,7 +29,7 @@ fi
 if [[ "${arguments}" == *" repos/acme/project/rulesets --paginate "* ]]; then
   case "${MOCK_SCENARIO}" in
     create|missing-main) ;;
-    same|update|param-drift|merge-method-drift) echo 42 ;;
+    same|update|param-drift|merge-method-drift|evaluate) echo 42 ;;
   esac
   exit 0
 fi
@@ -46,6 +46,15 @@ if [[ "${arguments}" == *" repos/acme/project/rulesets/42 "* && "${arguments}" !
   exit 0
 fi
 if [[ "${arguments}" == *" --method POST "* || "${arguments}" == *" --method PUT "* ]]; then
+  if [[ "${MOCK_SCENARIO}" == evaluate ]]; then
+    input_file=""
+    previous=""
+    for argument in "$@"; do
+      [[ "${previous}" == --input ]] && input_file="${argument}"
+      previous="${argument}"
+    done
+    jq -e '.enforcement == "evaluate"' "${input_file}" >/dev/null
+  fi
   exit 0
 fi
 
@@ -63,6 +72,14 @@ run_scenario() {
     MOCK_GH_LOG="${log_file}" \
     MOCK_RULESET_FILE="${repo_root}/github/rulesets/protect-main.json" \
     "${repo_root}/scripts/configure-github.sh" --repo acme/project > "${output_file}"
+}
+
+run_evaluate() {
+  PATH="${mock_bin}:${PATH}" \
+    MOCK_SCENARIO=evaluate \
+    MOCK_GH_LOG="${test_root}/evaluate.log" \
+    MOCK_RULESET_FILE="${repo_root}/github/rulesets/protect-main.json" \
+    "${repo_root}/scripts/configure-github.sh" --repo acme/project --enforcement evaluate > "${test_root}/evaluate.out"
 }
 
 run_scenario create
@@ -90,6 +107,15 @@ grep -q 'Updated active Protect main' "${test_root}/param-drift.out"
 run_scenario merge-method-drift
 grep -q -- '--method PUT' "${test_root}/merge-method-drift.log"
 grep -q 'Updated active Protect main' "${test_root}/merge-method-drift.out"
+
+run_evaluate
+grep -q -- '--method PUT' "${test_root}/evaluate.log"
+grep -q 'Updated evaluate Protect main' "${test_root}/evaluate.out"
+
+if "${repo_root}/scripts/configure-github.sh" --repo acme/project --enforcement invalid >/dev/null 2>&1; then
+  echo "configure-github unexpectedly accepted invalid enforcement" >&2
+  exit 1
+fi
 
 if PATH="${mock_bin}:${PATH}" \
   MOCK_SCENARIO=missing-main \
