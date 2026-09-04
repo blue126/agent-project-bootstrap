@@ -1,0 +1,13 @@
+schema_version: 1
+release: observe-v1
+repository: blue126/agent-project-bootstrap
+commit: 20ae04d640f252201e660db977a43a41f4bfccb0
+workflow: .github/workflows/governance-observe.yml
+mode: observe_only
+permissions:
+  contents: read
+  pull_requests: read
+secrets: none
+required_gate: false
+fixer: false
+auto_merge: false

@@ -104,6 +104,7 @@ bootstrap_paths=(
   ".agent/runtime/.gitignore"
   ".agents/skills/.gitignore"
   ".agent/governance/sensitive-paths.txt"
+  ".github/workflows/agent-governance-observe.yml"
 )
 paths_to_stage=()
 for path in "${bootstrap_paths[@]}"; do

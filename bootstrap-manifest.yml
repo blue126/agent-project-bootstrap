@@ -56,6 +56,10 @@ governance:
     sensitive_path_classifier: scripts/classify-sensitive-paths.sh
   reusable_workflows:
     observe_only: .github/workflows/governance-observe.yml
+    observe_release_sha: 20ae04d640f252201e660db977a43a41f4bfccb0
+    release_manifest: releases/governance-runtime.yml
+    thin_caller_template: templates/github/governance-observe.yml
+    installation: explicit_opt_in
     required_gate_available: false
 
 skills:

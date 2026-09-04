@@ -72,4 +72,11 @@ assert_contains "${repo_root}/scripts/rehydrate.sh" "npx skills@${cli_version} a
 # shellcheck disable=SC2016  # the single quotes are the point: match the literal source line
 assert_contains "${repo_root}/scripts/bootstrap.sh" 'npx "skills@${skills_cli_version}" add "${repo_root}"'
 
+observe_sha="$(awk '$1 == "observe_release_sha:" { print $2 }' "${repo_root}/bootstrap-manifest.yml")"
+[[ "${observe_sha}" =~ ^[0-9a-f]{40}$ ]] || { echo "Observe runtime is not pinned to a full SHA" >&2; exit 1; }
+assert_contains "${repo_root}/scripts/bootstrap.sh" "governance_observe_runtime_sha=\"${observe_sha}\""
+assert_contains "${repo_root}/templates/github/governance-observe.yml" "governance-observe.yml@${observe_sha}"
+assert_contains "${repo_root}/releases/governance-runtime.yml" "commit: ${observe_sha}"
+assert_contains "${repo_root}/releases/governance-runtime.yml" 'required_gate: false'
+
 echo "pin consistency tests passed"

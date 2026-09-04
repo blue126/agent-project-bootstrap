@@ -17,6 +17,9 @@ grep -q '^  validation: pending$' "${empty_target}/.agent/bootstrap.yml"
 grep -q '^  validation_mode: review_only$' "${empty_target}/.agent/bootstrap.yml"
 grep -q '^  validation_adapter_manifest: none$' "${empty_target}/.agent/bootstrap.yml"
 grep -q '^  auto_merge: disabled$' "${empty_target}/.agent/bootstrap.yml"
+grep -q '^  runtime_sha: none$' "${empty_target}/.agent/bootstrap.yml"
+grep -q '^  governance_observe: skip$' "${empty_target}/.agent/bootstrap.yml"
+test ! -e "${empty_target}/.github/workflows/agent-governance-observe.yml"
 test -f "${empty_target}/.agent/governance/sensitive-paths.txt"
 if [[ -d "${empty_target}/.agent/validation" ]] &&
   find "${empty_target}/.agent/validation" -type f -perm -u+x | grep -q .; then

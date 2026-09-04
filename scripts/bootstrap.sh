@@ -9,6 +9,7 @@ superpowers_ref="b36e0829c6d0140e93cfef2ca599b1b07d4a7797"
 understand_anything_upstream="https://github.com/Egonex-AI/Understand-Anything"
 understand_anything_tag="v2.9.0"
 understand_anything_ref="f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8"
+governance_observe_runtime_sha="20ae04d640f252201e660db977a43a41f4bfccb0"
 target_dir="$(pwd)"
 workflow=""
 repository_skills_mode=""
@@ -21,6 +22,7 @@ create_github=false
 configure_github=false
 github_repository=""
 github_visibility=""
+governance_observe_mode="skip"
 running_under_agent=false
 
 if [[ -n "${AI_AGENT:-}" || -n "${CODEX_SANDBOX:-}" || -n "${CODEX_CI:-}" || -n "${CODEX_THREAD_ID:-}" ]]; then
@@ -37,6 +39,7 @@ Usage: scripts/bootstrap.sh [--target DIR] [--workflow MODE]
                             [--create-github --github-repo OWNER/REPOSITORY
                              --github-visibility VISIBILITY]
                             [--configure-github --github-repo OWNER/REPOSITORY]
+                            [--install-governance-observe]
 
 Initialize Agent project policy in an empty or existing directory without overwriting files.
 
@@ -57,6 +60,8 @@ Initialize Agent project policy in an empty or existing directory without overwr
   --configure-github    Create or reconcile the Protect main GitHub ruleset
   --github-repo REPO    Explicit OWNER/REPOSITORY target for GitHub operations
   --github-visibility V Repository visibility: private, public, or internal
+  --install-governance-observe
+                        Install the observe-only thin caller pinned to the released runtime SHA
   -h, --help            Show this help
 EOF
 }
@@ -202,6 +207,10 @@ while [[ $# -gt 0 ]]; do
       github_visibility="$2"
       shift 2
       ;;
+    --install-governance-observe)
+      governance_observe_mode="install"
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -230,6 +239,8 @@ record_validation_mode="review_only"
 record_adapter_manifest="none"
 record_adapter_sha="none"
 record_auto_merge="disabled"
+record_governance_observe="${governance_observe_mode}"
+record_runtime_sha="none"
 
 if [[ "${update_mode}" == true ]]; then
   [[ -d "${target_dir}" ]] || {
@@ -255,6 +266,9 @@ if [[ "${update_mode}" == true ]]; then
   record_adapter_manifest="$(recorded_selection "${existing_manifest}" '^  validation_adapter_manifest:')"
   record_adapter_sha="$(recorded_selection "${existing_manifest}" '^  validation_adapter_sha256:')"
   record_auto_merge="$(recorded_selection "${existing_manifest}" '^  auto_merge:')"
+  recorded_observe="$(recorded_selection "${existing_manifest}" '^  governance_observe:')"
+  [[ -n "${recorded_observe}" ]] && record_governance_observe="${recorded_observe}"
+  record_runtime_sha="$(recorded_selection "${existing_manifest}" '^  runtime_sha:')"
   : "${record_reviewer:=none}"
   : "${record_fixer:=none}"
   : "${record_validation:=pending}"
@@ -262,6 +276,7 @@ if [[ "${update_mode}" == true ]]; then
   : "${record_adapter_manifest:=none}"
   : "${record_adapter_sha:=none}"
   : "${record_auto_merge:=disabled}"
+  : "${record_runtime_sha:=none}"
   repository_skills_mode="${cli_skills_mode:-skip}"
   understand_anything_mode="${cli_understand_anything_mode:-skip}"
   superpowers_mode="${cli_superpowers_mode:-skip}"
@@ -413,6 +428,10 @@ files=(
   "templates/skills.gitignore:.agents/skills/.gitignore"
   "templates/sensitive-paths.txt:.agent/governance/sensitive-paths.txt"
 )
+if [[ "${record_governance_observe}" == install ]]; then
+  files+=("templates/github/governance-observe.yml:.github/workflows/agent-governance-observe.yml")
+  record_runtime_sha="${governance_observe_runtime_sha}"
+fi
 
 manifest_path="${target_dir}/.agent/bootstrap.yml"
 managed_records=""
@@ -499,9 +518,11 @@ governance:
   validation_adapter_sha256: ${record_adapter_sha}
   auto_merge: ${record_auto_merge}
   sensitive_paths: .agent/governance/sensitive-paths.txt
+  runtime_sha: ${record_runtime_sha}
 components:
   curated_skills: ${record_skills}
   workflow_pack: ${workflow}
+  governance_observe: ${record_governance_observe}
 integrations:
   understand_anything:
     installation: ${record_understand_anything}
