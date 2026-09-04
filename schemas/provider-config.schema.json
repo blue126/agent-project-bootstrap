@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/blue126/agent-project-bootstrap/schemas/provider-config.schema.json",
+  "title": "Provider-neutral governance configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reviewer", "fixer", "validation"],
+  "properties": {
+    "reviewer": {"enum": ["none", "claude", "codex", "copilot"]},
+    "fixer": {"enum": ["none", "claude-action", "codex-action"]},
+    "validation": {"enum": ["pending", "configured"]},
+    "secret_mappings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      }
+    }
+  }
+}
