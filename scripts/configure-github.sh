@@ -3,12 +3,13 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 repository=""
+enforcement="active"
 ruleset_file="${repo_root}/github/rulesets/protect-main.json"
 api_version="2022-11-28"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/configure-github.sh --repo OWNER/REPOSITORY
+Usage: scripts/configure-github.sh --repo OWNER/REPOSITORY [--enforcement active|evaluate|disabled]
 
 Create or reconcile the repository-level "Protect main" ruleset.
 Requires authenticated gh, jq, an existing main branch, and permission to edit repository rules.
@@ -20,6 +21,11 @@ while [[ $# -gt 0 ]]; do
     --repo)
       [[ $# -ge 2 ]] || { echo "--repo requires OWNER/REPOSITORY" >&2; exit 2; }
       repository="$2"
+      shift 2
+      ;;
+    --enforcement)
+      [[ $# -ge 2 ]] || { echo "--enforcement requires active, evaluate, or disabled" >&2; exit 2; }
+      enforcement="$2"
       shift 2
       ;;
     -h|--help)
@@ -38,6 +44,7 @@ if [[ ! "${repository}" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
   echo "--repo must be an explicit OWNER/REPOSITORY value" >&2
   exit 2
 fi
+case "${enforcement}" in active|evaluate|disabled) ;; *) echo "Invalid --enforcement value" >&2; exit 2 ;; esac
 
 for command_name in gh jq; do
   command -v "${command_name}" >/dev/null 2>&1 || {
@@ -47,6 +54,13 @@ for command_name in gh jq; do
 done
 
 gh auth status >/dev/null
+
+rendered_ruleset="$(mktemp)"
+current_file="$(mktemp)"
+desired_file="$(mktemp)"
+cleanup() { rm -f "${rendered_ruleset}" "${current_file}" "${desired_file}"; }
+trap cleanup EXIT
+jq --arg enforcement "${enforcement}" '.enforcement = $enforcement' "${ruleset_file}" > "${rendered_ruleset}"
 
 api() {
   gh api \
@@ -72,17 +86,10 @@ if [[ "${ruleset_count}" -gt 1 ]]; then
 fi
 
 if [[ "${ruleset_count}" -eq 0 ]]; then
-  api --method POST "repos/${repository}/rulesets" --input "${ruleset_file}" >/dev/null
-  echo "Created active Protect main ruleset for ${repository}"
+  api --method POST "repos/${repository}/rulesets" --input "${rendered_ruleset}" >/dev/null
+  echo "Created ${enforcement} Protect main ruleset for ${repository}"
   exit 0
 fi
-
-current_file="$(mktemp)"
-desired_file="$(mktemp)"
-cleanup() {
-  rm -f "${current_file}" "${desired_file}"
-}
-trap cleanup EXIT
 
 normalize_ruleset() {
   jq -S '
@@ -127,7 +134,7 @@ normalize_ruleset() {
 
 api "repos/${repository}/rulesets/${ruleset_ids}" |
   normalize_ruleset > "${current_file}"
-normalize_ruleset "${ruleset_file}" > "${desired_file}"
+normalize_ruleset "${rendered_ruleset}" > "${desired_file}"
 
 if cmp -s "${current_file}" "${desired_file}"; then
   echo "Protect main is already configured for ${repository}"
@@ -135,5 +142,5 @@ if cmp -s "${current_file}" "${desired_file}"; then
 fi
 
 api --method PUT "repos/${repository}/rulesets/${ruleset_ids}" \
-  --input "${ruleset_file}" >/dev/null
-echo "Updated active Protect main ruleset for ${repository}"
+  --input "${rendered_ruleset}" >/dev/null
+echo "Updated ${enforcement} Protect main ruleset for ${repository}"

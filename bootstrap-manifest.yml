@@ -63,6 +63,8 @@ governance:
     repair_decision: scripts/evaluate-repair-decision.sh
     fixer_push_authorization: scripts/authorize-fixer-push.sh
     fixer_push_token_acquisition: after_authorization_only
+    safe_mode_rollback: scripts/set-governance-safe-mode.sh
+    ruleset_enforcement_rollback: scripts/configure-github.sh --enforcement evaluate|disabled
     repair_max_rounds: 3
     repair_initial_rollout_rounds: 1
     repo_validation_caller_installer: scripts/install-repo-validation-caller.sh
