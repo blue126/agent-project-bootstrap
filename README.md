@@ -143,11 +143,6 @@ Bootstrap 会把它写入的每个文件的哈希记进目标项目的 `.agent/b
 
 ## 维护与验证
 
-```bash
-shellcheck -S style scripts/*.sh tests/*.sh
-bash -n scripts/*.sh tests/*.sh
-for t in tests/*.sh; do "$t"; done
-./scripts/package-skills.sh
-```
+贡献或维护此仓库时，请参阅[贡献指南的“验证”章节](CONTRIBUTING.md#验证)，按改动范围选择本地检查，了解 CI 对推送提交的独立验证，并在准备发布分发物时执行打包步骤。
 
 不要提交个人数据、对话转录、生成报告、凭据、`.env`、证书或私钥。
