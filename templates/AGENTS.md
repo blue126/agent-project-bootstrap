@@ -26,4 +26,6 @@ Treat Superpowers as the managed pack for the `superpowers` workflow, not as a g
 
 ## Project-specific instructions
 
+- `components.claude_auto_review: selected` is a reminder only. It does not authorize GitHub App installation, authentication, secret configuration, remote mutation, or running /install-github-app; the user must run the official Claude Code installer themselves.
+
 Add durable project-specific commands, architecture constraints, and validation requirements below this heading.

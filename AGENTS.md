@@ -26,7 +26,7 @@ Instead, give the user the interactive command and a brief explanation, then wai
 /absolute/path/to/agent-project-bootstrap/scripts/bootstrap.sh --target "$PWD"
 ```
 
-Explain only that the command first offers the Curated Skills selector, offers the project-scoped Understand Anything integration, and then selects one active workflow. `github-workflow` is part of the Curated Skills catalog. Only when the user selects the `superpowers` workflow should the command offer the pinned Superpowers workflow-pack selector.
+Explain only that the command first offers the Curated Skills selector, offers the project-scoped Understand Anything integration, and then selects one active workflow. Only when the user selects `github-workflow` should the command offer the optional Claude Auto Review setup guidance selector. A selected value only records that the user wants the follow-up instruction; it does not authorize an Agent to run `/install-github-app`, install a GitHub App, configure authentication or secrets, create a remote, or mutate GitHub configuration. `github-workflow` is part of the Curated Skills catalog. Only when the user selects the `superpowers` workflow should the command offer the pinned Superpowers workflow-pack selector.
 
 The user must run the command themselves in a regular terminal session such as Terminal.app or iTerm. Do not execute `npx skills add` in an Agent-owned process, do not unset `AI_AGENT` or `CODEX_*` variables, and do not claim that a selector running in an Agent tool PTY is visible in the user's terminal. The `skills` CLI detects Agent environments and may switch to non-interactive installation even when a PTY exists.
 

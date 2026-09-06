@@ -6,12 +6,12 @@ test_root="$(mktemp -d)"
 trap 'rm -rf "${test_root}"' EXIT
 
 empty_target="${test_root}/empty"
-"${repo_root}/scripts/bootstrap.sh" --target "${empty_target}" --workflow github-workflow --skip-skills --skip-understand-anything --init-git
+"${repo_root}/scripts/bootstrap.sh" --target "${empty_target}" --workflow github-workflow --skip-skills --skip-understand-anything --skip-claude-auto-review --init-git
 
 test -f "${empty_target}/AGENTS.md"
 test -f "${empty_target}/CLAUDE.md"
 test -f "${empty_target}/.agent/policies/workflow-selection.md"
-grep -q '^schema_version: 4$' "${empty_target}/.agent/bootstrap.yml"
+grep -q '^schema_version: 5$' "${empty_target}/.agent/bootstrap.yml"
 grep -q '^workflow_id: github-workflow$' "${empty_target}/.agent/bootstrap.yml"
 grep -q '^  validation: pending$' "${empty_target}/.agent/bootstrap.yml"
 grep -q '^  validation_mode: review_only$' "${empty_target}/.agent/bootstrap.yml"
@@ -37,6 +37,87 @@ if git -C "${empty_target}" remote get-url origin >/dev/null 2>&1; then
   echo "bootstrap unexpectedly created origin" >&2
   exit 1
 fi
+
+mock_bin="${test_root}/mock-bin"
+mkdir -p "${mock_bin}"
+cat > "${mock_bin}/gh" <<'EOF'
+#!/usr/bin/env bash
+echo "bootstrap unexpectedly invoked gh" >&2
+exit 99
+EOF
+chmod +x "${mock_bin}/gh"
+
+selected_target="${test_root}/selected-auto-review"
+selected_output="$(PATH="${mock_bin}:${PATH}" "${repo_root}/scripts/bootstrap.sh" \
+  --target "${selected_target}" \
+  --workflow github-workflow \
+  --skip-skills \
+  --skip-understand-anything \
+  --select-claude-auto-review)"
+grep -q '^schema_version: 5$' "${selected_target}/.agent/bootstrap.yml"
+grep -q '^  claude_auto_review: selected$' "${selected_target}/.agent/bootstrap.yml"
+grep -q '/install-github-app' <<<"${selected_output}"
+grep -q '^  reviewer: none$' "${selected_target}/.agent/bootstrap.yml"
+test ! -e "${selected_target}/.github/workflows"
+if git -C "${selected_target}" remote get-url origin >/dev/null 2>&1; then
+  echo "Claude Auto Review selection unexpectedly created origin" >&2
+  exit 1
+fi
+
+skipped_target="${test_root}/skipped-auto-review"
+skipped_output="$("${repo_root}/scripts/bootstrap.sh" \
+  --target "${skipped_target}" \
+  --workflow github-workflow \
+  --skip-skills \
+  --skip-understand-anything \
+  --skip-claude-auto-review)"
+grep -q '^  claude_auto_review: skipped$' "${skipped_target}/.agent/bootstrap.yml"
+if grep -q '/install-github-app' <<<"${skipped_output}"; then
+  echo "skipped Claude Auto Review unexpectedly printed setup guidance" >&2
+  exit 1
+fi
+
+if "${repo_root}/scripts/bootstrap.sh" \
+  --target "${test_root}/conflicting-auto-review" \
+  --workflow github-workflow \
+  --skip-skills \
+  --skip-understand-anything \
+  --select-claude-auto-review \
+  --skip-claude-auto-review >/dev/null 2>&1; then
+  echo "bootstrap unexpectedly accepted conflicting Claude Auto Review choices" >&2
+  exit 1
+fi
+
+if "${repo_root}/scripts/bootstrap.sh" \
+  --target "${test_root}/missing-auto-review" \
+  --workflow github-workflow \
+  --skip-skills \
+  --skip-understand-anything </dev/null >/dev/null 2>&1; then
+  echo "non-interactive github-workflow bootstrap unexpectedly chose Claude Auto Review" >&2
+  exit 1
+fi
+
+if AI_AGENT=codex "${repo_root}/scripts/bootstrap.sh" \
+  --target "${test_root}/agent-missing-auto-review" \
+  --workflow github-workflow \
+  --skip-skills \
+  --skip-understand-anything >/dev/null 2>&1; then
+  echo "Agent bootstrap unexpectedly chose Claude Auto Review" >&2
+  exit 1
+fi
+
+for workflow in none superpowers; do
+  if "${repo_root}/scripts/bootstrap.sh" \
+    --target "${test_root}/inapplicable-${workflow}" \
+    --workflow "${workflow}" \
+    --skip-skills \
+    --skip-understand-anything \
+    --skip-superpowers \
+    --select-claude-auto-review >/dev/null 2>&1; then
+    echo "${workflow} unexpectedly accepted Claude Auto Review selection" >&2
+    exit 1
+  fi
+done
 
 if overwrite_output="$("${repo_root}/scripts/bootstrap.sh" --target "${empty_target}" --workflow none --skip-skills --skip-understand-anything 2>&1)"; then
   echo "bootstrap unexpectedly overwrote existing files" >&2

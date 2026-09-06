@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 name: agent-project-bootstrap
 source_repository: blue126/agent-project-bootstrap
 
@@ -137,3 +137,11 @@ github:
     - name: Protect main
       source: github/rulesets/protect-main.json
       target: refs/heads/main
+  # This records only a user's request for a post-bootstrap instruction. It does not configure GitHub App, authentication, secrets, remotes, providers, or workflows.
+  claude_auto_review:
+    opt_in: true
+    eligible_workflow: github-workflow
+    selection: prompt
+    post_bootstrap_command: /install-github-app
+    action: instruction_only
+    external_configuration: user_runs_official_claude_code_installer

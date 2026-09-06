@@ -60,7 +60,7 @@ for required_line in \
   '  validation_adapter_manifest:' \
   '  validation_adapter_sha256:'; do
   grep -q "^${required_line}" "${config}" || {
-    echo "Bootstrap configuration predates governance schema v4; update it before configuring validation" >&2
+    echo "Bootstrap configuration predates the required governance fields; run bootstrap --update before configuring validation" >&2
     exit 1
   }
 done

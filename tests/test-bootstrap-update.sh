@@ -16,7 +16,8 @@ target="${test_root}/project"
   --target "${target}" \
   --workflow github-workflow \
   --skip-skills \
-  --skip-understand-anything >/dev/null
+  --skip-understand-anything \
+  --skip-claude-auto-review >/dev/null
 
 grep -q '^managed_files:$' "${target}/.agent/bootstrap.yml"
 grep -q '^  AGENTS.md: [0-9a-f]\{64\}$' "${target}/.agent/bootstrap.yml"
@@ -88,6 +89,85 @@ sed -i.bak 's/^  curated_skills: skip$/  curated_skills: install/' "${installed_
 rm -f "${installed_target}/.agent/bootstrap.yml.bak"
 output="$("${templates}/scripts/bootstrap.sh" --target "${installed_target}" --update)"
 grep -q '^  curated_skills: install$' "${installed_target}/.agent/bootstrap.yml"
+
+# 7) Claude Auto Review selection is replayed without a reminder or selector.
+selected_target="${test_root}/selected-auto-review"
+"${templates}/scripts/bootstrap.sh" \
+  --target "${selected_target}" \
+  --workflow github-workflow \
+  --skip-skills \
+  --skip-understand-anything \
+  --select-claude-auto-review >/dev/null
+grep -q '^schema_version: 5$' "${selected_target}/.agent/bootstrap.yml"
+grep -q '^  claude_auto_review: selected$' "${selected_target}/.agent/bootstrap.yml"
+update_output="$("${templates}/scripts/bootstrap.sh" --target "${selected_target}" --update)"
+grep -q '^  claude_auto_review: selected$' "${selected_target}/.agent/bootstrap.yml"
+if grep -q '/install-github-app' <<<"${update_output}"; then
+  echo "--update unexpectedly repeated Claude Auto Review guidance" >&2
+  exit 1
+fi
+
+if "${templates}/scripts/bootstrap.sh" \
+  --target "${selected_target}" \
+  --update \
+  --select-claude-auto-review >/dev/null 2>&1; then
+  echo "--update unexpectedly accepted a Claude Auto Review selection override" >&2
+  exit 1
+fi
+
+if "${templates}/scripts/bootstrap.sh" \
+  --target "${selected_target}" \
+  --update \
+  --skip-claude-auto-review >/dev/null 2>&1; then
+  echo "--update unexpectedly accepted a Claude Auto Review skip override" >&2
+  exit 1
+fi
+
+# 8) A v5 skipped selection is replayed without a reminder.
+skipped_target="${test_root}/skipped-auto-review"
+"${templates}/scripts/bootstrap.sh" \
+  --target "${skipped_target}" \
+  --workflow github-workflow \
+  --skip-skills \
+  --skip-understand-anything \
+  --skip-claude-auto-review >/dev/null
+grep -q '^schema_version: 5$' "${skipped_target}/.agent/bootstrap.yml"
+grep -q '^  claude_auto_review: skipped$' "${skipped_target}/.agent/bootstrap.yml"
+skipped_update_output="$("${templates}/scripts/bootstrap.sh" --target "${skipped_target}" --update)"
+grep -q '^  claude_auto_review: skipped$' "${skipped_target}/.agent/bootstrap.yml"
+if grep -q '/install-github-app' <<<"${skipped_update_output}"; then
+  echo "v5 skipped replay unexpectedly printed Claude Auto Review guidance" >&2
+  exit 1
+fi
+
+# 9) v4 manifests migrate to v5 with the safe skipped default.
+v4_target="${test_root}/v4-auto-review"
+"${templates}/scripts/bootstrap.sh" \
+  --target "${v4_target}" \
+  --workflow github-workflow \
+  --skip-skills \
+  --skip-understand-anything \
+  --skip-claude-auto-review >/dev/null
+sed -i.bak \
+  -e 's/^schema_version: 5$/schema_version: 4/' \
+  -e '/^  claude_auto_review: /d' \
+  "${v4_target}/.agent/bootstrap.yml"
+rm -f "${v4_target}/.agent/bootstrap.yml.bak"
+v4_update_output="$("${templates}/scripts/bootstrap.sh" --target "${v4_target}" --update)"
+grep -q '^schema_version: 5$' "${v4_target}/.agent/bootstrap.yml"
+grep -q '^  claude_auto_review: skipped$' "${v4_target}/.agent/bootstrap.yml"
+if grep -q '/install-github-app' <<<"${v4_update_output}"; then
+  echo "v4 migration unexpectedly printed Claude Auto Review guidance" >&2
+  exit 1
+fi
+
+# 9) Invalid persisted state fails closed.
+sed -i.bak 's/^  claude_auto_review: skipped$/  claude_auto_review: enabled/' "${v4_target}/.agent/bootstrap.yml"
+rm -f "${v4_target}/.agent/bootstrap.yml.bak"
+if "${templates}/scripts/bootstrap.sh" --target "${v4_target}" --update >/dev/null 2>&1; then
+  echo "--update unexpectedly accepted an invalid Claude Auto Review state" >&2
+  exit 1
+fi
 
 # 7) Guard rails.
 if "${templates}/scripts/bootstrap.sh" --target "${test_root}/never-bootstrapped" --update >/dev/null 2>&1; then

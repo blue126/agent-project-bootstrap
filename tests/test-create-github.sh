@@ -44,6 +44,7 @@ GIT_COMMITTER_EMAIL="bootstrap-test@example.invalid" \
 PATH="${mock_bin}:${PATH}" "${repo_root}/scripts/bootstrap.sh" \
   --target "${target}" \
   --workflow github-workflow \
+  --skip-claude-auto-review \
   --skip-skills \
   --skip-understand-anything \
   --create-github \

@@ -1,4 +1,4 @@
-schema_version: 4
+schema_version: 5
 source: blue126/agent-project-bootstrap
 workflow_id: github-workflow
 governance:
@@ -15,6 +15,7 @@ components:
   curated_skills: skip
   workflow_pack: github-workflow
   governance_observe: install
+  claude_auto_review: skipped
 managed_files:
   .github/workflows/agent-governance-observe.yml: 8d211453b96d90d44689880bf206b43e20187227409c40cad1b15c97556b96a6
   .agent/governance/sensitive-paths.txt: e289621129b069702a36be2aa0b1d9d87530e68e12c7a8ca6a24bea452c3a0c7
