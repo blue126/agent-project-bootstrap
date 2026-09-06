@@ -49,7 +49,10 @@ npx skills@1.5.23 add /absolute/path/to/agent-project-bootstrap --list   # 只�
 1. 可选进入 Curated Skills 选择器，挑选能力和目标 Agent；`github-workflow` 也在这个目录中。
 2. 选择是否为当前项目安装 pinned Understand Anything（只写入项目内）。
 3. 激活一个 workflow：`none`、`github-workflow`、`superpowers` 三选一。
-4. 只有选择 `superpowers` 时，才进入 pinned Superpowers workflow pack 选择器。
+4. 仅当选择 `github-workflow` 时，选择是否记录 Claude Auto Review 的官方安装引导；选择后，用户必须在该项目的 Claude Code session 中亲自运行 `/install-github-app`。
+5. 只有选择 `superpowers` 时，才进入 pinned Superpowers workflow pack 选择器。
+
+Claude Auto Review 的选择只记录后续引导，不安装 GitHub App、Claude Code Action、认证或 secret，也不创建 workflow、启用 AI gate、Auto Fixer 或 Auto Merge。
 
 脚本不覆盖已有 policy/template，不假设 Git 或 `origin` 已存在；只有显式传入 `--init-git` 才初始化本地仓库（分支为 `main`）。
 
@@ -70,8 +73,11 @@ npx skills@1.5.23 add /absolute/path/to/agent-project-bootstrap --list   # 只�
 
 ```bash
 ./scripts/bootstrap.sh --target /path/to/project \
-  --workflow github-workflow --skip-skills --skip-understand-anything
+  --workflow github-workflow --skip-skills --skip-understand-anything \
+  --skip-claude-auto-review
 ```
+
+非交互的 `github-workflow` bootstrap 必须使用 `--select-claude-auto-review` 或 `--skip-claude-auto-review` 之一明确选择。
 
 `--install-skills` 和 `--install-superpowers` 在非 TTY 环境会拒绝执行，避免安装器退化为自动批量安装。启动 Superpowers 前，脚本会把 tag 解引用并验证其仍等于 manifest 中的 known-good commit；tag 漂移或缺失时拒绝安装。
 

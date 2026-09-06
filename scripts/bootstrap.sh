@@ -15,6 +15,7 @@ workflow=""
 repository_skills_mode=""
 superpowers_mode=""
 understand_anything_mode=""
+claude_auto_review_mode=""
 init_git=false
 update_mode=false
 force=false
@@ -53,6 +54,10 @@ Initialize Agent project policy in an empty or existing directory without overwr
                         Do not install Understand Anything in this project
   --install-superpowers Advanced: install the inactive or active Superpowers pack
   --skip-superpowers    Do not install the Superpowers workflow pack
+  --select-claude-auto-review
+                        Record Claude Auto Review setup guidance for github-workflow
+  --skip-claude-auto-review
+                        Do not record Claude Auto Review setup guidance
   --update              Refresh bootstrap-managed files that you have not edited
   --force               With --update, also overwrite files you have edited
   --init-git            Run git init when the target is not already a Git repository
@@ -177,6 +182,22 @@ while [[ $# -gt 0 ]]; do
       superpowers_mode="skip"
       shift
       ;;
+    --select-claude-auto-review)
+      [[ -z "${claude_auto_review_mode}" || "${claude_auto_review_mode}" == selected ]] || {
+        echo "--select-claude-auto-review conflicts with --skip-claude-auto-review" >&2
+        exit 2
+      }
+      claude_auto_review_mode="selected"
+      shift
+      ;;
+    --skip-claude-auto-review)
+      [[ -z "${claude_auto_review_mode}" || "${claude_auto_review_mode}" == skipped ]] || {
+        echo "--skip-claude-auto-review conflicts with --select-claude-auto-review" >&2
+        exit 2
+      }
+      claude_auto_review_mode="skipped"
+      shift
+      ;;
     --init-git)
       init_git=true
       shift
@@ -229,6 +250,7 @@ done
 cli_skills_mode="${repository_skills_mode}"
 cli_understand_anything_mode="${understand_anything_mode}"
 cli_superpowers_mode="${superpowers_mode}"
+cli_claude_auto_review_mode="${claude_auto_review_mode}"
 record_skills=""
 record_understand_anything=""
 record_superpowers=""
@@ -240,6 +262,7 @@ record_adapter_manifest="none"
 record_adapter_sha="none"
 record_auto_merge="disabled"
 record_governance_observe="${governance_observe_mode}"
+record_claude_auto_review="skipped"
 record_runtime_sha="none"
 
 if [[ "${update_mode}" == true ]]; then
@@ -253,9 +276,29 @@ if [[ "${update_mode}" == true ]]; then
     exit 1
   }
 
+  if [[ -n "${cli_claude_auto_review_mode}" ]]; then
+    echo "--select-claude-auto-review and --skip-claude-auto-review cannot be used with --update" >&2
+    exit 2
+  fi
+
+  recorded_claude_auto_review="$(recorded_selection "${existing_manifest}" '^  claude_auto_review:')"
+  if [[ -z "${recorded_claude_auto_review}" ]]; then
+    record_claude_auto_review="skipped"
+  else
+    record_claude_auto_review="${recorded_claude_auto_review}"
+  fi
+  case "${record_claude_auto_review}" in
+    selected|skipped) ;;
+    *)
+      echo "Invalid recorded Claude Auto Review state '${record_claude_auto_review}' in ${existing_manifest}" >&2
+      exit 1
+      ;;
+  esac
+
   # Replay the recorded selections so an update needs no arguments, but do not
   # re-run installers: refreshing policy files must not relaunch a selector.
   [[ -n "${workflow}" ]] || workflow="$(recorded_selection "${existing_manifest}" '^workflow_id:')"
+  claude_auto_review_mode="${record_claude_auto_review}"
   record_skills="${cli_skills_mode:-$(recorded_selection "${existing_manifest}" '^  curated_skills:')}"
   record_understand_anything="${cli_understand_anything_mode:-$(recorded_selection "${existing_manifest}" '^    installation:')}"
   record_superpowers="${cli_superpowers_mode:-$(recorded_selection "${existing_manifest}" '^  installation:')}"
@@ -300,7 +343,7 @@ if [[ "${running_under_agent}" == true ]]; then
     echo "Do not unset Agent or Codex detection variables to bypass this guard." >&2
     exit 2
   fi
-  if [[ -z "${workflow}" || -z "${repository_skills_mode}" || -z "${understand_anything_mode}" || ( "${workflow}" == superpowers && -z "${superpowers_mode}" ) ]]; then
+  if [[ -z "${workflow}" || -z "${repository_skills_mode}" || -z "${understand_anything_mode}" || ( "${workflow}" == superpowers && -z "${superpowers_mode}" ) || ( "${workflow}" == github-workflow && -z "${claude_auto_review_mode}" ) ]]; then
     echo "An Agent process cannot host the interactive bootstrap selectors." >&2
     echo "Give the user the command to run in a regular terminal; do not claim a selector is waiting in an Agent PTY." >&2
     exit 2
@@ -365,6 +408,25 @@ case "${workflow}" in
     exit 2
     ;;
 esac
+
+if [[ "${workflow}" != github-workflow && -n "${cli_claude_auto_review_mode}" ]]; then
+  echo "Claude Auto Review guidance requires --workflow github-workflow" >&2
+  exit 2
+fi
+
+if [[ "${workflow}" == github-workflow && -z "${claude_auto_review_mode}" ]]; then
+  if [[ -t 0 && -t 1 ]]; then
+    read -r -p "Enable Claude Auto Review setup guidance? [y/N]: " claude_auto_review_choice
+    case "${claude_auto_review_choice}" in
+      y|Y|yes|YES) claude_auto_review_mode="selected" ;;
+      *) claude_auto_review_mode="skipped" ;;
+    esac
+  else
+    echo "Interactive Claude Auto Review choice is required for github-workflow." >&2
+    echo "Guide the user to run this script in a terminal; do not choose on their behalf." >&2
+    exit 2
+  fi
+fi
 
 if [[ -z "${superpowers_mode}" ]]; then
   if [[ "${workflow}" != superpowers ]]; then
@@ -504,9 +566,13 @@ fi
 : "${record_understand_anything:=${understand_anything_mode}}"
 : "${record_superpowers:=${superpowers_mode}}"
 
+if [[ "${update_mode}" == false ]]; then
+  record_claude_auto_review="${claude_auto_review_mode:-skipped}"
+fi
+
 mkdir -p "$(dirname "${manifest_path}")"
 cat > "${manifest_path}" <<EOF
-schema_version: 4
+schema_version: 5
 source: blue126/agent-project-bootstrap
 workflow_id: ${workflow}
 governance:
@@ -523,6 +589,7 @@ components:
   curated_skills: ${record_skills}
   workflow_pack: ${workflow}
   governance_observe: ${record_governance_observe}
+  claude_auto_review: ${record_claude_auto_review}
 integrations:
   understand_anything:
     installation: ${record_understand_anything}
@@ -607,4 +674,8 @@ fi
 if [[ "${workflow}" == github-workflow && "${repository_skills_mode}" == skip ]]; then
   echo "github-workflow is active but Curated Skills installation was skipped by explicit choice."
   echo "Confirm that github-workflow is available through another approved scope before using it."
+fi
+if [[ "${update_mode}" == false && "${record_claude_auto_review}" == selected ]]; then
+  echo "Claude Auto Review guidance was selected."
+  echo "In a Claude Code session for this project, run /install-github-app to continue."
 fi

@@ -111,12 +111,29 @@ if "${repo_root}/scripts/check-governance-readiness.sh" --project "${pending_pro
   exit 1
 fi
 
+missing_fields_project="${test_root}/missing-governance-fields"
+"${repo_root}/scripts/bootstrap.sh" \
+  --target "${missing_fields_project}" --workflow none --skip-skills --skip-understand-anything >/dev/null
+mkdir -p "${missing_fields_project}/.agent/validation"
+cp "${adapter_root}/adapter.json" "${missing_fields_project}/.agent/validation/adapter.json"
+sed -i.bak '/^  validation_adapter_sha256:/d' "${missing_fields_project}/.agent/bootstrap.yml"
+rm -f "${missing_fields_project}/.agent/bootstrap.yml.bak"
+if missing_fields_output="$("${repo_root}/scripts/configure-validation.sh" \
+  --project "${missing_fields_project}" \
+  --manifest .agent/validation/adapter.json \
+  --mode shadow 2>&1)"; then
+  echo "configure-validation unexpectedly accepted missing governance fields" >&2
+  exit 1
+fi
+grep -Fqx 'Bootstrap configuration predates the required governance fields; run bootstrap --update before configuring validation' <<<"${missing_fields_output}"
+
 mkdir -p "${pending_project}/.agent/validation"
 cp "${adapter_root}/adapter.json" "${pending_project}/.agent/validation/adapter.json"
 "${repo_root}/scripts/configure-validation.sh" \
   --project "${pending_project}" \
   --manifest .agent/validation/adapter.json \
   --mode shadow >/dev/null
+grep -q '^schema_version: 5$' "${pending_project}/.agent/bootstrap.yml"
 "${repo_root}/scripts/check-governance-readiness.sh" --project "${pending_project}" >/dev/null
 
 echo "governance contract tests passed"
