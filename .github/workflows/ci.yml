@@ -52,5 +52,18 @@ jobs:
       - name: Validate Ruleset JSON
         run: jq empty github/rulesets/protect-main.json
 
+      - name: Set up Python for skill helper tests
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+
+      - name: Provision isolated skill helper dependencies
+        run: |
+          python3 -m venv "${RUNNER_TEMP}/installbmad-python"
+          "${RUNNER_TEMP}/installbmad-python/bin/python" -m pip install --disable-pip-version-check --no-cache-dir -r skills/installbmad/requirements.txt
+          printf '%s\n' "${RUNNER_TEMP}/installbmad-python/bin" >> "${GITHUB_PATH}"
+
       - name: Run all repository tests
+        env:
+          TMPDIR: ${{ runner.temp }}
         run: for test_file in tests/test-*.sh; do bash "${test_file}"; done
