@@ -10,7 +10,24 @@ understand_anything_upstream="https://github.com/Egonex-AI/Understand-Anything"
 understand_anything_tag="v2.9.0"
 understand_anything_ref="f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8"
 governance_observe_runtime_sha="20ae04d640f252201e660db977a43a41f4bfccb0"
+# The unqualified human entry is deliberately stateless: every run reconciles
+# observable project state. Legacy explicit operations retain their scope.
+legacy_request=false
+for argument in "$@"; do
+  case "${argument}" in
+    --target|--onboard) ;;
+    --resume|--status|--json|--revisit)
+      echo "Onboarding no longer stores progress. Re-run bootstrap.sh --target DIR; it will inspect the project again." >&2
+      exit 2 ;;
+    --*) legacy_request=true ;;
+  esac
+done
+if [[ "${legacy_request}" == false ]]; then
+  exec "${repo_root}/scripts/onboard.sh" "$@"
+fi
+
 target_dir="$(pwd)"
+adopt_existing=false
 workflow=""
 repository_skills_mode=""
 superpowers_mode=""
@@ -45,7 +62,8 @@ Usage: scripts/bootstrap.sh [--target DIR] [--workflow MODE]
 Initialize Agent project policy in an empty or existing directory without overwriting files.
 
   --target DIR          Project directory (default: current directory)
-  --workflow MODE       Active mode: none, github-workflow, or superpowers
+  --adopt-existing      Preserve existing instructions while adding managed policy
+  --workflow MODE       Active mode: none, github-workflow, superpowers, or bmad
   --install-skills      Interactively choose Curated Skills and target agents
   --skip-skills         Do not install Curated Skills during bootstrap
   --install-understand-anything
@@ -128,6 +146,10 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || { echo "--target requires a directory" >&2; exit 2; }
       target_dir="$2"
       shift 2
+      ;;
+    --adopt-existing)
+      adopt_existing=true
+      shift
       ;;
     --workflow)
       [[ $# -ge 2 ]] || { echo "--workflow requires a mode" >&2; exit 2; }
@@ -266,6 +288,14 @@ record_claude_auto_review="skipped"
 record_runtime_sha="none"
 
 if [[ "${update_mode}" == true ]]; then
+  command -v python3 >/dev/null || { echo "python3 is required to preserve update metadata" >&2; exit 2; }
+  if [[ "${repository_skills_mode}" == install || "${superpowers_mode}" == install ||
+        "${understand_anything_mode}" == install || "${governance_observe_mode}" == install ||
+        "${init_git}" == true || "${create_github}" == true || "${configure_github}" == true ||
+        -n "${github_repository}" || -n "${github_visibility}" || "${adopt_existing}" == true ]]; then
+    echo "--update cannot install components, initialize Git, publish, or change GitHub settings" >&2
+    exit 2
+  fi
   [[ -d "${target_dir}" ]] || {
     echo "--update requires an existing project directory: ${target_dir}" >&2
     exit 1
@@ -402,7 +432,7 @@ if [[ -z "${workflow}" ]]; then
 fi
 
 case "${workflow}" in
-  none|github-workflow|superpowers) ;;
+  none|github-workflow|superpowers|bmad) ;;
   *)
     echo "Invalid workflow '${workflow}'; choose none, github-workflow, or superpowers" >&2
     exit 2
@@ -546,7 +576,9 @@ else
   conflicts=()
   for mapping in "${files[@]}"; do
     destination="${mapping#*:}"
-    [[ ! -e "${target_dir}/${destination}" ]] || conflicts+=("${destination}")
+    if [[ -e "${target_dir}/${destination}" || -L "${target_dir}/${destination}" ]]; then
+      [[ "${adopt_existing}" == true && ! -L "${target_dir}/${destination}" ]] || conflicts+=("${destination}")
+    fi
   done
   [[ ! -e "${manifest_path}" ]] || conflicts+=(".agent/bootstrap.yml")
 
@@ -558,7 +590,18 @@ else
   fi
 
   for mapping in "${files[@]}"; do
-    install_managed_file "${mapping%%:*}" "${mapping#*:}"
+    source="${mapping%%:*}"
+    destination="${mapping#*:}"
+    if [[ "${adopt_existing}" == true && -e "${target_dir}/${destination}" ]]; then
+      if cmp -s "${repo_root}/${source}" "${target_dir}/${destination}"; then
+        record_managed "${destination}" "$(hash_file "${repo_root}/${source}")"
+      else
+        preserved_files+=("${destination}")
+        echo "Preserved existing file without taking ownership: ${destination}"
+      fi
+    else
+      install_managed_file "${source}" "${destination}"
+    fi
   done
 fi
 
@@ -571,7 +614,9 @@ if [[ "${update_mode}" == false ]]; then
 fi
 
 mkdir -p "$(dirname "${manifest_path}")"
-cat > "${manifest_path}" <<EOF
+manifest_output="$(mktemp "${manifest_path}.new.XXXXXX")"
+trap 'rm -f "${manifest_output}" "${manifest_output}.merged"' EXIT
+cat > "${manifest_output}" <<EOF
 schema_version: 5
 source: blue126/agent-project-bootstrap
 workflow_id: ${workflow}
@@ -604,7 +649,13 @@ superpowers:
   ref: ${superpowers_ref}
 managed_files:
 EOF
-printf '%s' "${managed_records}" >> "${manifest_path}"
+printf '%s' "${managed_records}" >> "${manifest_output}"
+if [[ "${update_mode}" == true ]]; then
+  python3 "${repo_root}/scripts/lib/merge-bootstrap-config.py" "${manifest_path}" "${manifest_output}" > "${manifest_output}.merged"
+  mv "${manifest_output}.merged" "${manifest_output}"
+fi
+mv "${manifest_output}" "${manifest_path}"
+trap - EXIT
 
 if [[ "${init_git}" == true ]] && ! git -C "${target_dir}" rev-parse --git-dir >/dev/null 2>&1; then
   # Match what --create-github requires, rather than whatever the user's
@@ -667,11 +718,11 @@ echo "Selected workflow: ${workflow}"
 if [[ "${create_github}" == false ]] && ! git -C "${target_dir}" remote get-url origin >/dev/null 2>&1; then
   echo "No origin remote configured; bootstrap did not create one."
 fi
-if [[ "${workflow}" == superpowers && "${superpowers_mode}" == skip ]]; then
+if [[ "${update_mode}" == false && "${workflow}" == superpowers && "${superpowers_mode}" == skip ]]; then
   echo "Superpowers is active but project installation was skipped by explicit choice."
   echo "Confirm that pinned v6.3.0 is available through another approved scope before using the workflow."
 fi
-if [[ "${workflow}" == github-workflow && "${repository_skills_mode}" == skip ]]; then
+if [[ "${update_mode}" == false && "${workflow}" == github-workflow && "${repository_skills_mode}" == skip ]]; then
   echo "github-workflow is active but Curated Skills installation was skipped by explicit choice."
   echo "Confirm that github-workflow is available through another approved scope before using it."
 fi

@@ -6,6 +6,9 @@ repository=""
 enforcement="active"
 profile="baseline"
 native_auto_merge="unchanged"
+project=""
+evidence_file=""
+with_pr_policy=false
 dry_run=false
 ruleset_file="${repo_root}/github/rulesets/protect-main.json"
 api_version="2022-11-28"
@@ -13,12 +16,17 @@ api_version="2022-11-28"
 usage() {
   cat <<'EOF'
 Usage: scripts/configure-github.sh --repo OWNER/REPOSITORY [--enforcement active|evaluate|disabled]
-       [--profile baseline|self] [--native-auto-merge unchanged|enable|disable] [--dry-run]
+       [--profile baseline|self|consumer] [--native-auto-merge unchanged|enable|disable] [--dry-run]
+       --profile consumer --project DIR --evidence FILE --repo OWNER/REPOSITORY
 
 The default baseline profile reconciles "Protect main" on the verified default
 branch. The self profile manages separate "Self CI gates" only for
 blue126/agent-project-bootstrap/main and never rewrites Protect main.
-Native auto-merge changes require self; disable only switches off that capability.
+Consumer manages additive "Project CI gates" from live-verified configured CI
+checks, preserving other rulesets. It requires an existing effective PR policy,
+or explicit --with-pr-policy to add a minimal unbypassed PR policy without rewriting existing protections.
+Native auto-merge changes require self or consumer. Consumer always validates
+CI evidence before writes; neither profile enrolls or merges any PR.
 Dry-run permits remote reads but no remote writes. It is not an offline mode.
 Requires authenticated gh, jq, git, and permission to edit the selected settings.
 EOF
@@ -46,6 +54,15 @@ while [[ $# -gt 0 ]]; do
       native_auto_merge="$2"
       shift 2
       ;;
+    --with-pr-policy)
+      with_pr_policy=true
+      shift
+      ;;
+    --project|--evidence)
+      [[ $# -ge 2 ]] || { echo "$1 requires a path" >&2; exit 2; }
+      if [[ "$1" == --project ]]; then project="$2"; else evidence_file="$2"; fi
+      shift 2
+      ;;
     --dry-run)
       dry_run=true
       shift
@@ -67,14 +84,24 @@ if [[ ! "${repository}" =~ ^[^/[:space:]]+/[^/[:space:]]+$ ]]; then
   exit 2
 fi
 case "${enforcement}" in active|evaluate|disabled) ;; *) echo "Invalid --enforcement value" >&2; exit 2 ;; esac
-case "${profile}" in baseline|self) ;; *) echo "Invalid --profile value" >&2; exit 2 ;; esac
+case "${profile}" in baseline|self|consumer) ;; *) echo "Invalid --profile value" >&2; exit 2 ;; esac
 case "${native_auto_merge}" in unchanged|enable|disable) ;; *) echo "Invalid --native-auto-merge value" >&2; exit 2 ;; esac
 if [[ "${profile}" == self ]]; then
   [[ "${repository}" == blue126/agent-project-bootstrap && "${enforcement}" == active ]] || {
     echo "self requires --repo blue126/agent-project-bootstrap and active enforcement" >&2; exit 2;
   }
+elif [[ "${profile}" == consumer ]]; then
+  [[ -n "${project}" && -f "${evidence_file}" && "${enforcement}" == active ]] || {
+    echo "consumer requires --project, --evidence, and active enforcement" >&2; exit 2;
+  }
+  [[ "${repository}" != blue126/agent-project-bootstrap ]] || {
+    echo "Use --profile self for the bootstrap source repository" >&2; exit 2;
+  }
 elif [[ "${native_auto_merge}" != unchanged ]]; then
-  echo "Native auto-merge settings require --profile self" >&2; exit 2
+  echo "Native auto-merge settings require --profile self or consumer" >&2; exit 2
+fi
+if [[ "${profile}" != consumer && ( -n "${project}" || -n "${evidence_file}" || "${with_pr_policy}" == true ) ]]; then
+  echo "--project and --evidence require --profile consumer" >&2; exit 2
 fi
 
 for command_name in gh jq git; do
@@ -101,6 +128,12 @@ api() {
           echo "Internal error: dry-run attempted a mutating API call" >&2; return 1 ;;
       esac
     done
+  fi
+  if [[ "${profile}" == consumer ]]; then
+    gh api --hostname github.com \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: ${api_version}" "$@"
+    return
   fi
   gh api \
     -H "Accept: application/vnd.github+json" \
@@ -145,6 +178,10 @@ normalize_self_ruleset() {
       if .type == "required_status_checks" then
         .parameters.required_status_checks |= sort_by(.context, .integration_id) |
         .parameters.do_not_enforce_on_create = (.parameters.do_not_enforce_on_create // false)
+      elif .type == "pull_request" then
+        .parameters.required_reviewers = (.parameters.required_reviewers // []) |
+        .parameters |= (if has("require_extra_approval_for_unattributed_changes") then .
+          else . + {require_extra_approval_for_unattributed_changes:true} end)
       else . end] | sort_by(.type)}' "$@"
 }
 
@@ -266,8 +303,122 @@ configure_self() {
   reconcile_native_auto_merge
 }
 
+configure_consumer() {
+  local checker gate_id gate_file branch preflight_status
+  checker="${repo_root}/scripts/check-bootstrap-evidence.sh"
+  gate_file="${work_dir}/consumer-gate.json"
+  # A file is configuration, not proof. Snapshot it, then verify current PR HEAD,
+  # successful Actions runs/jobs, and their explicitly configured producers live.
+  cp "${evidence_file}" "${work_dir}/evidence.json"
+  bash "${checker}" --project "${project}" --repo "${repository}" --kind ci \
+    --evidence "${work_dir}/evidence.json" > "${work_dir}/ci.json" || {
+      jq . "${work_dir}/ci.json" >&2; return 1;
+    }
+  branch="$(jq -er '.evidence.base_branch' "${work_dir}/ci.json")"
+  # Missing gates may be added, but a missing/bypassed baseline or a producer
+  # conflict must fail before any write. Existing baseline rules are never edited.
+  preflight_status=0
+  bash "${checker}" --project "${project}" --repo "${repository}" --kind protection \
+    --evidence "${work_dir}/ci.json" > "${work_dir}/protection.json" || preflight_status=$?
+  if [[ "${preflight_status}" != 0 ]]; then
+    jq -e --argjson add_pr "${with_pr_policy}" '.status == "blocked" and
+      ((.reason == "required_checks_not_effective" and .evidence.baseline_verified == true) or
+       ($add_pr and .reason == "pr_policy_not_effective" and .evidence.baseline_verified == false))' "${work_dir}/protection.json" >/dev/null || {
+        jq . "${work_dir}/protection.json" >&2; return 1;
+      }
+  fi
+  jq --arg branch "${branch}" '
+    {name: "Project CI gates", target: "branch", enforcement: "active", bypass_actors: [],
+     conditions: {ref_name: {include: ["refs/heads/" + $branch], exclude: []}},
+     rules: [{type: "required_status_checks", parameters: {
+       strict_required_status_checks_policy: true, do_not_enforce_on_create: false,
+       required_status_checks: [.evidence.checks[] | {context, integration_id}]}}]}
+  ' "${work_dir}/ci.json" > "${work_dir}/consumer-template.json"
+  if [[ "${with_pr_policy}" == true ]] && [[ "$(jq -r '.evidence.baseline_verified' "${work_dir}/protection.json")" != true ]]; then
+    jq '.rules += [{type:"pull_request",parameters:{dismiss_stale_reviews_on_push:false,
+      require_code_owner_review:false,require_last_push_approval:false,required_approving_review_count:0,
+      required_review_thread_resolution:true,allowed_merge_methods:["squash"]}}]' \
+      "${work_dir}/consumer-template.json" > "${work_dir}/with-pr.json"
+    mv "${work_dir}/with-pr.json" "${work_dir}/consumer-template.json"
+  fi
+  gate_id="$(find_self_ruleset 'Project CI gates')"
+  if [[ -n "${gate_id}" ]]; then
+    api "repos/${repository}/rulesets/${gate_id}" > "${gate_file}"
+    jq -e --arg ref "refs/heads/${branch}" '
+      .target == "branch" and .bypass_actors == [] and
+      .conditions == {ref_name: {include: [$ref], exclude: []}} and
+      (.rules | type == "array") and
+      ([.rules[] | select(.type == "required_status_checks")] | length <= 1)
+    ' "${gate_file}" >/dev/null || {
+      echo "Project CI gates scope, bypass, or cardinality is unsafe; left unchanged" >&2; return 1;
+    }
+    jq --slurpfile desired "${work_dir}/consumer-template.json" '
+      $desired[0].rules[0].parameters.required_status_checks as $wanted |
+      ([.rules[] | select(.type == "required_status_checks")][0] //
+        {type: "required_status_checks", parameters: {required_status_checks: []}}) as $existing |
+      $existing.parameters.required_status_checks as $checks |
+      if ($checks | type) != "array" then error("Invalid required check list") else . end |
+      if any($wanted[]; . as $required |
+        any($checks[]; .context == $required.context and .integration_id != $required.integration_id))
+      then error("Conflicting required check producer; refusing to overwrite") else . end |
+      {name, target, enforcement: "active", bypass_actors, conditions,
+       rules: ([.rules[] | select(.type != "required_status_checks")] + [
+         $existing | .parameters.strict_required_status_checks_policy = true |
+         .parameters.do_not_enforce_on_create = false |
+         .parameters.required_status_checks = (($checks + $wanted) | unique_by(.context, .integration_id))])} |
+      if any($desired[0].rules[]; .type == "pull_request") then
+        if any(.rules[]; .type == "pull_request") then
+          (.rules[] | select(.type == "pull_request").parameters.required_review_thread_resolution) = true
+        else .rules += [$desired[0].rules[] | select(.type == "pull_request")] end
+      else . end
+    ' "${gate_file}" > "${rendered_ruleset}" || return 1
+    normalize_self_ruleset "${gate_file}" > "${current_file}"
+    normalize_self_ruleset "${rendered_ruleset}" > "${desired_file}"
+    if cmp -s "${current_file}" "${desired_file}"; then
+      echo "Project CI gates is already configured for ${repository}"
+    elif [[ "${dry_run}" == true ]]; then
+      echo "Would PUT repos/${repository}/rulesets/${gate_id} with:"
+      jq . "${rendered_ruleset}"
+    else
+      api --method PUT "repos/${repository}/rulesets/${gate_id}" --input "${rendered_ruleset}" >/dev/null
+    fi
+  else
+    cp "${work_dir}/consumer-template.json" "${rendered_ruleset}"
+    if [[ "${dry_run}" == true ]]; then
+      echo "Would POST repos/${repository}/rulesets with:"
+      jq . "${rendered_ruleset}"
+    else
+      api --method POST "repos/${repository}/rulesets" --input "${rendered_ruleset}" >/dev/null
+    fi
+  fi
+  if [[ "${dry_run}" == true ]]; then
+    echo "Dry-run: would verify effective PR policy and producer-bound Project CI gates before native auto-merge changes"
+    reconcile_native_auto_merge
+    return
+  fi
+  gate_id="$(find_self_ruleset 'Project CI gates')"
+  [[ -n "${gate_id}" ]] || { echo "Project CI gates missing on readback" >&2; return 1; }
+  api "repos/${repository}/rulesets/${gate_id}" > "${gate_file}"
+  normalize_self_ruleset "${gate_file}" > "${current_file}"
+  normalize_self_ruleset "${rendered_ruleset}" > "${desired_file}"
+  cmp -s "${current_file}" "${desired_file}" || { echo "Project CI gates readback mismatch" >&2; return 1; }
+  bash "${checker}" --project "${project}" --repo "${repository}" --kind ci \
+    --evidence "${work_dir}/ci.json" > "${work_dir}/ci-readback.json" || {
+      jq . "${work_dir}/ci-readback.json" >&2; return 1;
+    }
+  bash "${checker}" --project "${project}" --repo "${repository}" --kind protection \
+    --evidence "${work_dir}/ci-readback.json" > "${work_dir}/protection.json" || {
+      jq . "${work_dir}/protection.json" >&2; return 1;
+    }
+  echo "Verified active Project CI gates on ${repository}/${branch}; coverage is configured checks only"
+  reconcile_native_auto_merge
+}
+
 if [[ "${profile}" == self ]]; then
   configure_self
+  exit 0
+elif [[ "${profile}" == consumer ]]; then
+  configure_consumer
   exit 0
 fi
 

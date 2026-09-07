@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-test_root="$(mktemp -d)"
+test_root="$(mktemp -d "${TMPDIR:?TMPDIR must be set}/create-github.XXXXXX")"
 trap 'rm -rf "${test_root}"' EXIT
 
 mock_bin="${test_root}/bin"
@@ -116,5 +116,26 @@ if PATH="${mock_bin}:${PATH}" "${repo_root}/scripts/create-github.sh" \
   echo "create-github unexpectedly published unrelated untracked files" >&2
   exit 1
 fi
+
+git -C "${dirty_target}" diff --cached --quiet
+[[ ! -e "${dirty_target}/.git/index" ]]
+
+# An outside tracked edit must also be detected before staging generated files.
+tracked_target="${test_root}/tracked"
+git init -q --initial-branch=main "${tracked_target}"
+printf 'original\n' > "${tracked_target}/user-file.txt"
+git -C "${tracked_target}" add user-file.txt
+GIT_AUTHOR_NAME="Bootstrap Test" GIT_AUTHOR_EMAIL="bootstrap-test@example.invalid" \
+GIT_COMMITTER_NAME="Bootstrap Test" GIT_COMMITTER_EMAIL="bootstrap-test@example.invalid" \
+  git -C "${tracked_target}" commit -qm fixture
+printf 'modified\n' > "${tracked_target}/user-file.txt"
+cp "${repo_root}/templates/AGENTS.md" "${tracked_target}/AGENTS.md"
+cp "${tracked_target}/.git/index" "${test_root}/index-before"
+if PATH="${mock_bin}:${PATH}" "${repo_root}/scripts/create-github.sh" \
+  --source "${tracked_target}" --repo acme/project --visibility private >/dev/null 2>&1; then
+  echo "create-github unexpectedly published unrelated tracked changes" >&2
+  exit 1
+fi
+cmp "${tracked_target}/.git/index" "${test_root}/index-before"
 
 echo "create-github tests passed"

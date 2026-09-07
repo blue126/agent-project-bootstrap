@@ -49,6 +49,21 @@ runtime_dir="${runtime_parent}/repo"
 skills_dir="${target_dir}/.agents/skills"
 upstream_skills="understand-anything-plugin/skills"
 
+# Installation may precede bootstrap's broad runtime policy. Protect only this
+# integration's checkout and staging directories without owning or replacing
+# .agent/runtime/.gitignore (bootstrap installs that policy later).
+for directory in "${target_dir}/.agent" "${target_dir}/.agent/runtime" "${runtime_parent}" "${runtime_dir}" "${target_dir}/.agents" "${skills_dir}"; do
+  [[ ! -L "${directory}" ]] || { echo "Refusing a symbolic-link installation directory: ${directory}" >&2; exit 1; }
+done
+runtime_ignore="${runtime_parent}/.gitignore"
+[[ ! -L "${runtime_ignore}" ]] || { echo "Refusing a symbolic-link runtime ignore file" >&2; exit 1; }
+mkdir -p "${runtime_parent}"
+for pattern in '/repo/' '/.install.*/'; do
+  if [[ ! -f "${runtime_ignore}" ]] || ! grep -Fxq "${pattern}" "${runtime_ignore}"; then
+    printf '\n%s\n' "${pattern}" >> "${runtime_ignore}"
+  fi
+done
+
 verify_runtime() {
   actual_ref="$(git -C "${runtime_dir}" rev-parse HEAD 2>/dev/null || true)"
   if [[ "${actual_ref}" != "${ref}" ]]; then
