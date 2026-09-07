@@ -18,11 +18,15 @@ Never develop, commit, or push directly on `main` or `master`. Use a purpose-spe
 
 ## Workflow mode
 
-Read `.agent/bootstrap.yml`. Workflow modes are opt-in and mutually exclusive. Never run `github-workflow` and `superpowers` together for the same task.
+Read `.agent/bootstrap.yml` and preserve existing project instructions. Known workflow modes are `none`, `github-workflow`, `superpowers`, and `bmad`. Workflow execution is opt-in and mutually exclusive: never run more than one workflow for the same task.
 
-Installing components and activating a workflow are separate decisions. Repository Skills and Superpowers may coexist only when the user explicitly requests both. If the user has not chosen installed components and one active workflow, stop and ask; never infer either choice from a generic bootstrap request.
+Installing components, detecting existing installations, and activating a workflow are separate decisions. Installation records do not authorize workflow execution. Activate only through an explicit user request or an explicit active-workflow selection; if incompatible workflows are requested, stop and ask the user to choose one.
 
-Treat Superpowers as the managed pack for the `superpowers` workflow, not as a general third-party Skill category. In the standard flow, offer its installation only when that workflow is selected.
+For generic bootstrap requests, guide the user to the resumable terminal wizard rather than choosing a workflow or creating a chat questionnaire. The wizard detects only `github-workflow`, `superpowers`, and `bmad`: keep a detected workflow without activating, reinstalling, or overwriting it; if none is detected, offer one installation or skip. Skipping does not disable existing unknown rules. Ordinary Skills are a separate optional installation, not another workflow mode. Superpowers remains the managed pack for `superpowers`, not a general third-party Skill category.
+
+The user must run interactive installers in a regular human terminal. Never run them in an Agent-owned PTY, clear `AI_AGENT` or `CODEX_*` detection variables, or add unsolicited `--all`, `-y`, or `-g`. Understand Anything is project-scoped and optional; installing it does not imply analysis has run.
+
+Onboarding may explicitly create or connect a GitHub repository, but does not stage, commit, or push. Local validation, CI, review, and branch protection require separate evidence; a completed prompt is not verified governance. Sensitive governance changes require human handling. `--update` preserves metadata and does not authorize installation or Git mutation.
 
 ## Project-specific instructions
 

@@ -2,13 +2,14 @@
 
 Workflow frameworks are explicit, mutually exclusive execution modes.
 
-- Allowed values are `none`, `github-workflow`, and `superpowers`.
-- A generic bootstrap request selects nothing; ask the user when the active workflow is unspecified.
-- Activate a workflow only when the user explicitly opts in or `.agent/bootstrap.yml` selects it.
-- Never activate `github-workflow` and `superpowers` together for the same task.
-- If instructions request both, stop workflow execution and ask the user to choose one.
-- Installation and activation are separate decisions. Repository Skills and Superpowers may both be installed when explicitly requested, but only one workflow may be active.
-- Selecting a workflow is not permission to install its components. Obtain an explicit installation choice, scope, and target agent first.
-- In the standard flow, offer the Superpowers installation only when `superpowers` is the selected workflow. Installing an inactive workflow pack is an advanced action requiring an explicit request.
+- Known values are `none`, `github-workflow`, `superpowers`, and `bmad`.
+- A generic bootstrap request selects no active workflow. Guide the user to the terminal onboarding wizard; do not choose for them or recreate it as a chat questionnaire.
+- The wizard detects only `github-workflow`, `superpowers`, and `bmad`. Keep detected workflows without activating, reinstalling, or overwriting them. Detection is not permission to execute them.
+- If no known workflow is found, offer installation of one known workflow or the skip option. Do not classify unknown/custom workflows. Skipping installation does not disable existing unknown rules or remove project instructions.
+- Installation and activation are separate decisions. Multiple packs may be installed by explicit request outside the wizard, but only one workflow may be active for a task. Bootstrap never activates multiple workflows together.
+- Activate a workflow only when the user explicitly opts in or `.agent/bootstrap.yml` records an explicit active-workflow selection. Component inventory alone is not activation.
+- If instructions request incompatible workflows, stop workflow execution and ask the user to choose one.
+- Selecting an active workflow is not permission to install components. Obtain an explicit installation choice, scope, and target agent first. Ordinary Skills are selected separately and installed immediately after that choice; they are not a workflow mode.
+- Superpowers is the managed pack for `superpowers`, not a general third-party Skill category. BMAD is the `bmad` workflow; its installation likewise does not start a BMAD workflow.
 - A selected workflow may not weaken `AGENTS.md`, safety constraints, or explicit user instructions.
-- Changing the project selection is a deliberate configuration change and should be reviewed like code.
+- Changing an existing active selection is a deliberate configuration change and should be reviewed like code; resuming onboarding must not silently replace it.

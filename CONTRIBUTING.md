@@ -37,6 +37,18 @@ for test_file in tests/test-*.sh; do bash "${test_file}"; done
 
 无论本地运行了哪些检查，CI 都会在干净的 Ubuntu 和 macOS 环境中验证推送到 PR 的实际提交。CI 提供评审和合并所需的独立、可重跑证据。
 
+### Onboarding 与证据
+
+修改 onboarding 时同步检查 `AGENTS.md`、`templates/AGENTS.md`、`policies/workflow-selection.md`、`bootstrap-manifest.yml` 与 [onboarding 指南](examples/onboarding.md)。默认 `bootstrap.sh --target DIR` 是无状态协调向导：每次根据真实项目状态重新检查，不能持久化“跳过/做到第几题”。显式参数旧入口和 `--update` 的边界不可混用。重点验证已有 workflow 不被覆盖或激活、跳过不禁用未知规则、普通 Skills 选择后立即安装、create/connect 不提交或推送，以及 update 保留 metadata 并拒绝安装/Git mutation 参数。
+
+```bash
+bash tests/test-policy-text.sh
+```
+
+再运行改动对应的 bootstrap/onboarding/GitHub 测试。测试目标、模拟 Git/`gh`、本地验证 key 目录与收据都应放在 `$TMPDIR` 创建的临时目录，不写开发者的真实项目或用户状态目录，不进行真实安装或网络 mutation。新目标必须验证没有凭空出现 `origin`。自动测试可以 mock 安装器，但不能把 Agent PTY 冒充人类终端，也不能清除 Agent 检测变量绕过安全限制。
+
+`scripts/check-bootstrap-evidence.sh --help` 说明当前证据检查接口。报告应分别说明本地验证、远端 CI、review 与保护的实际证据；会话阶段完成、安装选择或本地测试通过，都不能代替远端强制检查。缺少凭据、远端分支或检查结果时，应保留 pending/blocked 和下一步，而不是标记成功。不要把测试环境的模拟安装说成源码仓库已经安装了组件。
+
 ### 本仓库的 CI 合并门槛
 
 通用 `Protect main` 只管理 bootstrap 基础保护。本仓库另用独立的 `Self CI gates` 强制要求 `shellcheck`、`bootstrap-validation (ubuntu-latest)`、`bootstrap-validation (macos-latest)`，绑定 GitHub Actions App `15368`，并要求分支基于最新 main。重命名这些 CI 检查时，必须同步更新 `github/rulesets/self-ci-gates.json`，避免 PR 一直等待旧名称。

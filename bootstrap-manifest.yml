@@ -101,18 +101,49 @@ skills:
       project_path: .claude/skills
       user_path: ~/.claude/skills
 
+onboarding:
+  entrypoint: scripts/bootstrap.sh --target DIR
+  mode: stateless_reconcile
+  stages:
+    - introduction
+    - known_workflow_detection_and_optional_installation
+    - ordinary_skills_selection_and_immediate_installation
+    - understand_anything
+    - policy_setup
+    - git_create_or_connect
+    - local_validation_and_ci_review_protection
+    - evidence_summary
+  human_terminal_required_for_installation: true
+  agent_owned_pty_allowed: false
+  commits: false
+  pushes: false
+  update_preserves_metadata: true
+  update_rejects_installation_and_git_mutation_flags: true
+  interrupted_run: rerun_entrypoint_and_reinspect_project
+  external_handoff: rerun_entrypoint_and_verify_evidence
+
 workflows:
   default: prompt
   allowed:
     - none
     - github-workflow
     - superpowers
+    - bmad
+  detected_known_workflows:
+    - github-workflow
+    - superpowers
+    - bmad
+  existing_workflow: preserve_without_activation_or_overwrite
+  none_detected: install_one_or_skip
+  classify_unknown_workflows: false
+  skip_disables_existing_rules: false
   mutually_exclusive: true
   explicit_opt_in: true
   installation_may_coexist: true
   activation_is_separate_from_installation: true
-  standard_installation_follows_active_workflow: true
-  parallel_workflow_pack_installation: explicit_only
+  detection_is_activation: false
+  standard_installation_follows_active_workflow: false
+  parallel_workflow_pack_installation: explicit_only_outside_wizard
 
 integrations:
   - name: understand-anything
@@ -121,9 +152,19 @@ integrations:
     scope: project
   - name: superpowers
     manifest: integrations/superpowers/integration.yml
-    installation_default: when_workflow_selected
+    installation_default: when_no_known_workflow_and_explicitly_selected
 
 github:
+  onboarding_repository_setup:
+    opt_in: true
+    repository_must_be_explicit: true
+    visibility_must_be_explicit_for_creation: true
+    create_mode: scripts/create-github.sh --create-only
+    attach_mode: scripts/create-github.sh --attach-only
+    stages_files: false
+    creates_initial_commit: false
+    pushes_main: false
+  # Legacy explicit publication path, not the default onboarding wizard.
   repository_creation:
     opt_in: true
     repository_must_be_explicit: true
