@@ -45,7 +45,9 @@ for test_file in tests/test-*.sh; do bash "${test_file}"; done
 bash tests/test-policy-text.sh
 ```
 
-修改 README 首次使用入口时，还要运行 `tests/test-onboarding.sh` 中的 README journey 回归：从首页文案和命令顺序出发，模拟获取候选工具到隔离 HOME，进入新/已有项目，不带 `--target` 启动，并确认工具目录未被初始化、项目 origin/暂存区未被误改。离线回归模拟下载和安装，不代表公开 GitHub 已发布候选版本或真实客户端已加载；真实 GitHub clone 与候选覆盖快照的走查结果必须分开报告。
+`README.md` 默认英文，`README.zh-CN.md` 提供中文，两份文档顶部互相链接。修改时同步维护章节内容、命令、版本和安全边界，不把终端界面语言与文档语言混为一谈。
+
+修改 README 首次使用入口时，还要运行 `tests/test-onboarding.sh` 中的中英文 README journey 回归：两种语言分别覆盖新项目与已有项目，从首页文案和命令顺序出发，模拟获取候选工具到隔离 HOME，进入新/已有项目，不带 `--target` 启动，并确认工具目录未被初始化、项目 origin/暂存区未被误改。离线回归模拟下载和安装，不代表公开 GitHub 已发布候选版本或真实客户端已加载；真实 GitHub clone 与候选覆盖快照的走查结果必须分开报告。
 
 再运行改动对应的 bootstrap/onboarding/GitHub 测试。测试目标、模拟 Git/`gh`、本地验证 key 目录与收据都应放在 `$TMPDIR` 创建的临时目录，不写开发者的真实项目或用户状态目录，不进行真实安装或网络 mutation。新目标必须验证没有凭空出现 `origin`。自动测试可以 mock 安装器，但不能把 Agent PTY 冒充人类终端，也不能清除 Agent 检测变量绕过安全限制。
 
