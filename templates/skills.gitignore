@@ -1,2 +1,3 @@
-*
-!.gitignore
+# Shared Skills are project assets; review code, licenses and secrets before staging.
+# Ignore only specific local artifacts, not this entire directory.
+# Runtime-backed links must be recreated by the pinned bootstrap integration.

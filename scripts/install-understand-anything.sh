@@ -6,12 +6,17 @@ upstream="https://github.com/Egonex-AI/Understand-Anything.git"
 ref="f08763d11d0202a8a8f52b5dedda6d1b2e2ebac8"
 patch_file="${repo_root}/integrations/understand-anything/patches/project-scope-and-git-hardening.patch"
 target_dir="$(pwd)"
+claude_selected=false
 
 usage() {
   cat <<'EOF'
-Usage: scripts/install-understand-anything.sh [--target DIR]
+Usage: scripts/install-understand-anything.sh [--target DIR] [--agent ID ...]
 
 Install the pinned Understand Anything integration into one project only.
+Supported agents: claude-code, codex, opencode, universal. Repeat --agent to
+select multiple clients. Omitting --agent retains the legacy shared links.
+Canonical .agents/skills links are always retained for runtime compatibility;
+selecting claude-code also creates project-local .claude/skills links.
 EOF
 }
 
@@ -20,6 +25,15 @@ while [[ $# -gt 0 ]]; do
     --target)
       [[ $# -ge 2 ]] || { echo "--target requires a directory" >&2; exit 2; }
       target_dir="$2"
+      shift 2
+      ;;
+    --agent)
+      [[ $# -ge 2 ]] || { echo "--agent requires an ID" >&2; exit 2; }
+      case "$2" in
+        claude-code) claude_selected=true ;;
+        codex|opencode|universal) ;;
+        *) echo "Unsupported agent: $2" >&2; exit 2 ;;
+      esac
       shift 2
       ;;
     -h|--help)
@@ -52,8 +66,15 @@ upstream_skills="understand-anything-plugin/skills"
 # Installation may precede bootstrap's broad runtime policy. Protect only this
 # integration's checkout and staging directories without owning or replacing
 # .agent/runtime/.gitignore (bootstrap installs that policy later).
-for directory in "${target_dir}/.agent" "${target_dir}/.agent/runtime" "${runtime_parent}" "${runtime_dir}" "${target_dir}/.agents" "${skills_dir}"; do
+skill_roots=("${skills_dir}")
+installation_directories=("${target_dir}/.agent" "${target_dir}/.agent/runtime" "${runtime_parent}" "${runtime_dir}" "${target_dir}/.agents" "${skills_dir}")
+if [[ "${claude_selected}" == true ]]; then
+  skill_roots+=("${target_dir}/.claude/skills")
+  installation_directories+=("${target_dir}/.claude" "${target_dir}/.claude/skills")
+fi
+for directory in "${installation_directories[@]}"; do
   [[ ! -L "${directory}" ]] || { echo "Refusing a symbolic-link installation directory: ${directory}" >&2; exit 1; }
+  [[ ! -e "${directory}" || -d "${directory}" ]] || { echo "Installation directory is not a directory: ${directory}" >&2; exit 1; }
 done
 runtime_ignore="${runtime_parent}/.gitignore"
 [[ ! -L "${runtime_ignore}" ]] || { echo "Refusing a symbolic-link runtime ignore file" >&2; exit 1; }
@@ -109,23 +130,35 @@ fi
   exit 1
 }
 
-mkdir -p "${skills_dir}"
-for skill_source in "${runtime_dir}/${upstream_skills}"/*; do
-  [[ -d "${skill_source}" && -f "${skill_source}/SKILL.md" ]] || continue
-  skill_name="$(basename "${skill_source}")"
-  destination="${skills_dir}/${skill_name}"
-  relative_target="../../.agent/runtime/understand-anything/repo/${upstream_skills}/${skill_name}"
-
-  if [[ -L "${destination}" ]]; then
-    [[ "$(readlink "${destination}")" == "${relative_target}" ]] || {
-      echo "Skill link already exists with a different target: ${destination}" >&2
+# Preflight the complete canonical + client link set before creating any links.
+# A collision in the last Skill/client must not leave earlier links installed.
+destinations=()
+relative_targets=()
+for skill_root in "${skill_roots[@]}"; do
+  for skill_source in "${runtime_dir}/${upstream_skills}"/*; do
+    [[ -d "${skill_source}" && -f "${skill_source}/SKILL.md" ]] || continue
+    skill_name="$(basename "${skill_source}")"
+    destination="${skill_root}/${skill_name}"
+    relative_target="../../.agent/runtime/understand-anything/repo/${upstream_skills}/${skill_name}"
+    if [[ -L "${destination}" ]]; then
+      [[ "$(readlink "${destination}")" == "${relative_target}" ]] || {
+        echo "Skill link already exists with a different target: ${destination}" >&2
+        exit 1
+      }
+    elif [[ -e "${destination}" ]]; then
+      echo "Skill path already exists; refusing to overwrite it: ${destination}" >&2
       exit 1
-    }
-  elif [[ -e "${destination}" ]]; then
-    echo "Skill path already exists; refusing to overwrite it: ${destination}" >&2
-    exit 1
-  else
-    ln -s "${relative_target}" "${destination}"
+    fi
+    destinations+=("${destination}")
+    relative_targets+=("${relative_target}")
+  done
+done
+for skill_root in "${skill_roots[@]}"; do
+  mkdir -p "${skill_root}"
+done
+for ((index=0; index<${#destinations[@]}; index++)); do
+  if [[ ! -L "${destinations[index]}" ]]; then
+    ln -s "${relative_targets[index]}" "${destinations[index]}"
   fi
 done
 

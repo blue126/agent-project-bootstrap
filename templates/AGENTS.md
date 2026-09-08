@@ -10,6 +10,8 @@ Read and follow:
 - `.agent/policies/git.md`
 - `.agent/policies/workflow-selection.md`
 
+Use `.agent/policies/git.md` for purpose-based asset tracking, exclusions, and pre-commit review, including shared hidden/generated assets. Installing the policy does not mean first-commit contents are verified; report what will be tracked, excluded, or reproduced and the review evidence separately.
+
 ## Repository authority
 
 When `origin/main` exists, it is the eventual code authority. Do not assume an `origin` remote exists in a newly initialized project.
@@ -22,7 +24,9 @@ Read `.agent/bootstrap.yml` and preserve existing project instructions. Known wo
 
 Installing components, detecting existing installations, and activating a workflow are separate decisions. Installation records do not authorize workflow execution. Activate only through an explicit user request or an explicit active-workflow selection; if incompatible workflows are requested, stop and ask the user to choose one.
 
-For generic bootstrap requests, guide the user to the resumable terminal wizard rather than choosing a workflow or creating a chat questionnaire. The wizard detects only `github-workflow`, `superpowers`, and `bmad`: keep a detected workflow without activating, reinstalling, or overwriting it; if none is detected, offer one installation or skip. Skipping does not disable existing unknown rules. Ordinary Skills are a separate optional installation, not another workflow mode. Superpowers remains the managed pack for `superpowers`, not a general third-party Skill category.
+For generic bootstrap requests, guide the user to the README quick start: acquire or reuse the toolkit, enter their own project root, and run the toolkit's bootstrap.sh without --target (defaults to the current directory). Do not mistake the toolkit checkout for the target project or route this request to Skills-only installation. Use the local-first stateless terminal wizard rather than choosing for them or creating a chat questionnaire. It confirms project clients, preserves or explicitly selects a workflow, offers Skills, prepares policy and local Git, then reports readiness and first-task instructions. Re-running rechecks actual state, not a saved position. The wizard detects only `github-workflow`, `superpowers`, and `bmad`; detection alone never activates or reinstalls them. Explicit adoption may set the active preference after configuration confirmation, but does not run tasks. Ordinary Skills remain independently available even with existing installations. Skipping does not disable unknown rules; Superpowers remains a managed workflow pack, not a generic third-party Skill category.
+
+`project_agents` is a portable project preference, not installation evidence or authorization. The user confirms clients every run; native installers reuse those targets while retaining scope/method choices. Universal denotes a shared directory, not every client. Local files do not prove a client session has loaded them. GitHub/CI/review/protection are an optional continuation after local setup; do not contact even an existing remote before that opt-in.
 
 The user must run interactive installers in a regular human terminal. Never run them in an Agent-owned PTY, clear `AI_AGENT` or `CODEX_*` detection variables, or add unsolicited `--all`, `-y`, or `-g`. Understand Anything is project-scoped and optional; installing it does not imply analysis has run.
 

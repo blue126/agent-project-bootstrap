@@ -40,11 +40,15 @@ grep -q 'does not authorize GitHub App installation, authentication, secret conf
 grep -q '/install-github-app' "${repo_root}/README.md"
 grep -q 'Claude Auto Review guidance was selected' "${repo_root}/scripts/bootstrap.sh"
 
-# The stateless wizard is installation-first, not an activation questionnaire.
+# Local-first onboarding keeps installation, explicit adoption and execution separate.
 for guard in \
-  'entrypoint: scripts/bootstrap.sh --target DIR' \
+  'entrypoint: scripts/bootstrap.sh' \
+  'default_target: current_working_directory' \
+  'target_override: --target DIR' \
   'mode: stateless_reconcile' \
-  'ordinary_skills_selection_and_immediate_installation' \
+  'ordinary_skills_with_existing_installations: always_offer' \
+  'client_selection: confirm_every_run' \
+  'remote_inspection: after_collaboration_opt_in_only' \
   'existing_workflow: preserve_without_activation_or_overwrite' \
   'none_detected: install_one_or_skip' \
   'classify_unknown_workflows: false' \
@@ -59,8 +63,8 @@ for guard in \
   grep -Fq -- "${guard}" "${repo_root}/bootstrap-manifest.yml"
 done
 grep -q '^    - bmad$' "${repo_root}/bootstrap-manifest.yml"
-grep -Fq 'Skipping known-workflow installation does not disable existing unknown rules' "${repo_root}/AGENTS.md"
-grep -Fq 'bootstrap never activates multiple workflows together' "${repo_root}/AGENTS.md"
+grep -Fq 'Skipping does not disable unknown rules' "${repo_root}/AGENTS.md"
+grep -Fq 'do not activate multiple workflows for a task' "${repo_root}/AGENTS.md"
 grep -Fq "do not unset \`AI_AGENT\` or \`CODEX_*\` variables" "${repo_root}/AGENTS.md"
 grep -Fq "Do not add \`--all\`, \`-y\`, or \`-g\` unless explicitly requested" "${repo_root}/AGENTS.md"
 grep -Fq 'selector running in an Agent tool PTY' "${repo_root}/AGENTS.md"
@@ -68,7 +72,7 @@ grep -Fq 'never use its upstream global installer' "${repo_root}/AGENTS.md"
 grep -Fq 'It never stages, commits, or pushes' "${repo_root}/AGENTS.md"
 grep -Fq 'Update never re-runs an installer and rejects installation or Git-mutation flags' "${repo_root}/AGENTS.md"
 grep -Fq 'Installation records do not authorize workflow execution' "${repo_root}/templates/AGENTS.md"
-grep -Fq 'Skipping does not disable existing unknown rules' "${repo_root}/templates/AGENTS.md"
+grep -Fq 'Skipping does not disable unknown rules' "${repo_root}/templates/AGENTS.md"
 grep -Fq 'Never run them in an Agent-owned PTY' "${repo_root}/templates/AGENTS.md"
 grep -Fq "Known values are \`none\`, \`github-workflow\`, \`superpowers\`, and \`bmad\`" "${repo_root}/policies/workflow-selection.md"
 grep -Fq 'Component inventory alone is not activation' "${repo_root}/policies/workflow-selection.md"

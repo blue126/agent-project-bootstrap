@@ -19,6 +19,17 @@ installation:
   user_level_writes_allowed: false
   runtime_path: .agent/runtime/understand-anything/repo
   skills_path: .agents/skills
+  canonical_skills_always_retained: true
+  agent_selection: repeated_--agent
+  no_agent_selection: legacy_shared_links
+  client_skills_paths:
+    claude-code: .claude/skills
+    codex: .agents/skills
+    opencode: .agents/skills
+    universal: .agents/skills
+  client_links: relative_to_project_runtime
+  link_collision_policy: preflight_all_destinations_then_create_missing_links
+  existing_runtime: verify_pin_and_patch_then_add_missing_client_links
   installer: scripts/install-understand-anything.sh
   local_patches:
     - patches/project-scope-and-git-hardening.patch

@@ -1,0 +1,11 @@
+# Local environment values; share only reviewed, value-free examples.
+.env
+.env.*
+!.env.example
+
+# Operating-system metadata, not project configuration.
+.DS_Store
+
+# Bootstrap runtime contents are governed by .agent/runtime/.gitignore.
+# Shared Agent definitions, dependency locks and formal project documents
+# are intentionally NOT excluded here. Add stack-specific rules as needed.

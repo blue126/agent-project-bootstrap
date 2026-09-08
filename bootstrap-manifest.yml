@@ -23,6 +23,16 @@ project_files:
   - source: templates/sensitive-paths.txt
     destination: .agent/governance/sensitive-paths.txt
 
+git_assets:
+  policy: policies/git.md
+  ignore_template: templates/project.gitignore
+  configurator: scripts/configure-git-ignore.py
+  application: reviewed_diff_and_snapshot_confirmation
+  existing_rules: preserve_and_merge_additively
+  legacy_skill_ignore_migration: separate_explicit_confirmation
+  update_changes_ignore_boundaries: false
+  first_publication_checks: separate_from_policy_installation
+
 governance:
   lifecycle:
     initial_validation: pending
@@ -94,25 +104,42 @@ skills:
     - name: codex
       project_path: .agents/skills
       user_path: ~/.codex/skills
+      bmad_tool: codex
     - name: opencode
       project_path: .agents/skills
       user_path: ~/.config/opencode/skills
+      bmad_tool: opencode
+      bmad_commands: .opencode/commands
     - name: claude-code
       project_path: .claude/skills
       user_path: ~/.claude/skills
+      bmad_tool: claude-code
+    - name: universal
+      project_path: .agents/skills
+      bmad_tool: none
 
 onboarding:
-  entrypoint: scripts/bootstrap.sh --target DIR
+  # Invoke the acquired toolkit's script from the user's project directory.
+  entrypoint: scripts/bootstrap.sh
+  default_target: current_working_directory
+  target_override: --target DIR
   mode: stateless_reconcile
   stages:
-    - introduction
-    - known_workflow_detection_and_optional_installation
-    - ordinary_skills_selection_and_immediate_installation
-    - understand_anything
-    - policy_setup
+    - introduction_and_local_inspection
+    - explicit_client_selection
+    - workflow_selection
+    - workflow_and_optional_skills_installation
+    - policy_and_local_git_setup
+    - local_readiness_and_first_task
+  optional_collaboration:
     - git_create_or_connect
     - local_validation_and_ci_review_protection
     - evidence_summary
+  client_selection: confirm_every_run
+  client_preference_field: project_agents
+  native_scope_and_method_prompts: preserved
+  ordinary_skills_with_existing_installations: always_offer
+  remote_inspection: after_collaboration_opt_in_only
   human_terminal_required_for_installation: true
   agent_owned_pty_allowed: false
   commits: false
