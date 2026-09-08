@@ -23,6 +23,13 @@ except ImportError:
 
 BMM_SKILLS = {"bmad-prd", "bmad-architecture", "bmad-build"}
 VERIFIED_VERSIONS = {"6.12.0"}
+# Standalone Skill registry, verified from BMAD v6.12.0
+# tools/installer/ide/platform-codes.yaml and _config-driven.js.
+TOOL_ROOTS = {
+    "claude-code": {"skills": ".claude/skills"},
+    "codex": {"skills": ".agents/skills"},
+    "opencode": {"skills": ".agents/skills", "commands": ".opencode/commands"},
+}
 IDENTIFIER = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]*\Z")
 VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?\Z")
 
@@ -96,13 +103,19 @@ def installed(target):
     return {"version": installation["version"], "modules": modules, "tools": tools}
 
 
-def record(target, version, previous, requested):
+def record(target, version, previous, requested, interactive=False):
     if version not in VERIFIED_VERSIONS:
         raise InvalidInput(f"Unsupported installer contract: {version}; verified versions: {', '.join(sorted(VERIFIED_VERSIONS))}")
     modules = sorted(set(previous["modules"] + requested["modules"] + ["core"]))
     tools = sorted(set(previous["tools"] + requested["tools"]))
+    if "universal" in tools:
+        raise InvalidInput("universal is not a BMAD tool; select a supported native client")
+    if not isinstance(interactive, bool):
+        raise InvalidInput("interactive must be a boolean")
     action = "update" if previous["modules"] else None
     argv = ["npx", "--yes", f"bmad-method@{version}", "install", "--yes", "--directory", str(target)]
+    if interactive:
+        argv = [argument for argument in argv if argument != "--yes"]
     if action:
         argv.extend(["--action", action])
     # The installer injects core; retain it explicitly for a core-only request.
@@ -117,11 +130,24 @@ def record(target, version, previous, requested):
         "requested": requested,
         "expected": {"modules": modules, "tools": tools},
         "argv": argv,
+        **({"interactive": True} if interactive else {}),
     }
 
 
-def preflight(target, version, modules, tools):
-    for relative in ("_bmad", ".claude/skills"):
+def required_entries(modules, tools):
+    skills = {"bmad-help"} | (BMM_SKILLS if "bmm" in modules else set())
+    for tool in tools:
+        roots = TOOL_ROOTS.get(tool, {})
+        for name in sorted(skills):
+            if "skills" in roots:
+                yield f"{roots['skills']}/{name}/SKILL.md"
+            if "commands" in roots:
+                yield f"{roots['commands']}/{name}.md"
+
+
+def preflight(target, version, modules, tools, interactive=False):
+    roots = {root for config in TOOL_ROOTS.values() for root in config.values()}
+    for relative in {"_bmad"} | roots:
         within(target, relative)
     bmad = within(target, "_bmad")
     if bmad.exists() or bmad.is_symlink():
@@ -132,12 +158,18 @@ def preflight(target, version, modules, tools):
             raise InvalidInput("Refusing to plan a downgrade of the existing installer version")
     else:
         legacy = target / "bmad"
-        skills = within(target, ".claude/skills")
-        if legacy.exists() or legacy.is_symlink() or any(skills.glob("bmad-*")):
+        if legacy.exists() or legacy.is_symlink() or any(
+            any(within(target, root).glob("bmad-*")) for root in roots
+        ):
             raise InvalidInput("BMAD evidence exists without _bmad; inspect the legacy or incomplete installation")
         previous = {"version": None, "modules": [], "tools": []}
     requested = {"modules": identifiers(modules, "requested modules"), "tools": identifiers(tools, "requested tools")}
-    return record(target, version, previous, requested)
+    plan = record(target, version, previous, requested, interactive=interactive)
+    # Existing or dangling expected entries must not redirect a later installer
+    # outside the project. Missing entries are allowed: this is a repair plan.
+    for relative in required_entries(plan["expected"]["modules"], plan["expected"]["tools"]):
+        within(target, relative)
+    return plan
 
 
 def load_record(target, path):
@@ -159,7 +191,7 @@ def load_record(target, path):
     elif previous.get("version") is not None or previous["tools"]:
         raise InvalidInput("Invalid fresh-install before-record")
     version = before.get("installer_version")
-    if not isinstance(version, str) or before != record(target, version, previous, requested):
+    if not isinstance(version, str) or before != record(target, version, previous, requested, interactive=before.get("interactive", False)):
         raise InvalidInput("Before-record is inconsistent; use unmodified preflight JSON")
     return before
 
@@ -196,29 +228,42 @@ def verify(target, before):
     except (OSError, ValueError, csv.Error) as error:
         errors.append(str(error))
 
-    count = None
-    if "claude-code" in expected["tools"]:
-        skills = within(target, ".claude/skills")
-        count = 0
-        for entry in sorted(skills.glob("*/SKILL.md")):
-            try:
-                if read_text(target, entry.relative_to(target)).strip():
-                    count += 1
-            except (OSError, ValueError):
-                # Unrelated external/broken skills do not prove or disprove BMAD.
-                continue
-        for name in sorted(required_skills):
-            try:
-                if not read_text(target, f".claude/skills/{name}/SKILL.md").strip():
-                    raise InvalidInput(f"Empty skill entry: {name}")
-            except (OSError, ValueError) as error:
-                errors.append(str(error))
+    counts = {}
+    for tool in expected["tools"]:
+        if tool not in TOOL_ROOTS:
+            continue
+        counts[tool] = 0
+        try:
+            skills = within(target, TOOL_ROOTS[tool]["skills"])
+            for entry in sorted(skills.glob("*/SKILL.md")):
+                try:
+                    if read_text(target, entry.relative_to(target)).strip():
+                        counts[tool] += 1
+                except (OSError, ValueError):
+                    # Unrelated external/broken skills do not prove BMAD loading.
+                    continue
+        except (OSError, ValueError) as error:
+            errors.append(str(error))
+    for relative in sorted(set(required_entries(expected["modules"], expected["tools"]))):
+        try:
+            content = read_text(target, relative).strip()
+            if not content:
+                raise InvalidInput(f"Empty tool entry: {relative}")
+            if relative.startswith(".opencode/commands/"):
+                # Pinned upstream writes <canonicalId>.md, with a description
+                # frontmatter and a standalone @skills/<canonicalId> body.
+                name = Path(relative).stem
+                if f"@skills/{name}" not in content.splitlines():
+                    raise InvalidInput(f"Missing OpenCode skill pointer: {relative}")
+        except (OSError, ValueError) as error:
+            errors.append(str(error))
     return {
         "status": "failed" if errors else "files_verified",
         "target": str(target),
         "installed": after,
-        "claude_skill_count": count,
-        "tool_integrations_not_verified": [tool for tool in expected["tools"] if tool != "claude-code"],
+        "claude_skill_count": counts.get("claude-code"),
+        "tool_skill_counts": counts,
+        "tool_integrations_not_verified": sorted((set(after["tools"]) | set(expected["tools"])) - TOOL_ROOTS.keys()),
         "errors": errors,
         "session_loading": "not_verified",
         "python_runtime": "not_verified",
@@ -233,6 +278,7 @@ def main():
     plan.add_argument("--installer-version", required=True)
     plan.add_argument("--modules", required=True, help="Requested comma-separated module IDs")
     plan.add_argument("--tools", required=True, help="Requested comma-separated tool IDs")
+    plan.add_argument("--interactive", action="store_true", help="Plan a user-hosted interactive installer (omit --yes)")
     check = commands.add_parser("verify", help="Verify installed files against preflight JSON")
     check.add_argument("--target", required=True)
     check.add_argument("--before", required=True, help="Saved, unmodified preflight JSON")
@@ -240,7 +286,7 @@ def main():
     try:
         target = target_directory(args.target)
         if args.command == "preflight":
-            result = preflight(target, args.installer_version, args.modules.split(","), args.tools.split(","))
+            result = preflight(target, args.installer_version, args.modules.split(","), args.tools.split(","), interactive=args.interactive)
         else:
             result = verify(target, load_record(target, args.before))
     except (OSError, ValueError, yaml.YAMLError, RuntimeError) as error:

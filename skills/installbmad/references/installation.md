@@ -66,9 +66,9 @@ git -C "/absolute/project/path" check-ignore -v -- _bmad/ _bmad/_config/manifest
 | 源码/工具不可用 | 保留未知标识并停止说明，不能丢弃后续装；移除或自定义来源处理不属于本 helper 的自动路径 |
 | registry 或缓存报错 | 报告实际请求和错误；npx 成功可能来自缓存，不能推出网络一定可达，也不沿用历史封禁断言 |
 
-脚本 `preflight` 的退出码：0 表示生成了计划，2 表示输入/依赖/安装状态不支持。JSON 的 `argv` 是参数数组，不是要交给 `eval` 的字符串。计划不包含文件内容备份，也不保证更新不改变保留模块的版本或配置。
+脚本 `preflight` 的退出码：0 表示生成了计划，2 表示输入/依赖/安装状态不支持。JSON 的 `argv` 是参数数组，不是要交给 `eval` 的字符串。可加 `--interactive` 为人类终端生成保留模块/tools 并集的交互参数，省去 npm 和 BMAD 两处 `--yes`；不是授权 Agent 代跑选择器。计划不包含文件内容备份，也不保证更新不改变保留模块的版本或配置。
 
-脚本 `verify` 的退出码：0 表示文件验收通过，1 表示文件验收不通过，2 表示目标、记录或 manifest 无法安全读取。它检查 6.12.0 的 `bmad-prd`、`bmad-architecture`、`bmad-build` 标识，而非模糊显示名称；Claude 数量仅统计目标内可读的直接 skill 入口，外部/损坏的无关 skills 不计入。其他工具的 manifest 记录通过不等于其运行集成已验证。
+脚本 `verify` 的退出码：0 表示文件验收通过，1 表示文件验收不通过，2 表示目标、记录或 manifest 无法安全读取。它检查 6.12.0 的 `bmad-prd`、`bmad-architecture`、`bmad-build` 标识，而非模糊显示名称；Claude 数量仅统计目标内可读的直接 skill 入口，外部/损坏的无关 skills 不计入。目前覆盖 Claude Code、Codex 的 Skill 入口以及 OpenCode 的 Skill/command pointer；未知 tools 会列为未验证。`universal` 不是 BMAD 6.12.0 tool ID。文件或 manifest 记录通过不等于任何客户端会话已加载。
 
 ## 运行验证
 

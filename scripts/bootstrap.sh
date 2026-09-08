@@ -17,7 +17,7 @@ for argument in "$@"; do
   case "${argument}" in
     --target|--onboard) ;;
     --resume|--status|--json|--revisit)
-      echo "Onboarding no longer stores progress. Re-run bootstrap.sh --target DIR; it will inspect the project again." >&2
+      echo "Onboarding no longer stores progress. Re-run the toolkit's bootstrap.sh from your project directory; --target DIR is only needed for another target." >&2
       exit 2 ;;
     --*) legacy_request=true ;;
   esac
@@ -28,6 +28,7 @@ fi
 
 target_dir="$(pwd)"
 adopt_existing=false
+project_agents=()
 workflow=""
 repository_skills_mode=""
 superpowers_mode=""
@@ -43,12 +44,25 @@ github_visibility=""
 governance_observe_mode="skip"
 running_under_agent=false
 
-if [[ -n "${AI_AGENT:-}" || -n "${CODEX_SANDBOX:-}" || -n "${CODEX_CI:-}" || -n "${CODEX_THREAD_ID:-}" ]]; then
+# shellcheck disable=SC1091
+source "${repo_root}/scripts/lib/agent-environment.sh"
+if is_agent_environment; then
   running_under_agent=true
 fi
 
 usage() {
   cat <<'EOF'
+Start here (see README for prerequisites and obtaining the toolkit):
+  git clone https://github.com/blue126/agent-project-bootstrap.git "$HOME/agent-project-bootstrap"
+  cd /path/to/your-project
+  "$HOME/agent-project-bootstrap/scripts/bootstrap.sh"
+
+Reuse an existing toolkit checkout; do not overwrite it. Run the script from
+YOUR project, not the toolkit checkout. With no arguments, the wizard targets
+the current working directory and displays that path before you start.
+Use --target DIR only to initialize a different directory.
+
+Explicit/advanced options:
 Usage: scripts/bootstrap.sh [--target DIR] [--workflow MODE]
                             [--update [--force]]
                             [--install-skills | --skip-skills] [--init-git]
@@ -62,6 +76,7 @@ Usage: scripts/bootstrap.sh [--target DIR] [--workflow MODE]
 Initialize Agent project policy in an empty or existing directory without overwriting files.
 
   --target DIR          Project directory (default: current directory)
+  --agent ID            Select project clients for templates and installers (repeatable; new setup only)
   --adopt-existing      Preserve existing instructions while adding managed policy
   --workflow MODE       Active mode: none, github-workflow, superpowers, or bmad
   --install-skills      Interactively choose Curated Skills and target agents
@@ -145,6 +160,17 @@ while [[ $# -gt 0 ]]; do
     --target)
       [[ $# -ge 2 ]] || { echo "--target requires a directory" >&2; exit 2; }
       target_dir="$2"
+      shift 2
+      ;;
+    --agent)
+      [[ $# -ge 2 ]] || { echo "--agent requires a client ID" >&2; exit 2; }
+      case "$2" in claude-code|codex|opencode|universal) ;; *) echo "Unknown project agent: $2" >&2; exit 2 ;; esac
+      if [[ ${#project_agents[@]} -gt 0 ]]; then
+        for client in "${project_agents[@]}"; do
+          [[ "${client}" != "$2" ]] || { echo "Duplicate project agent: $2" >&2; exit 2; }
+        done
+      fi
+      project_agents+=("$2")
       shift 2
       ;;
     --adopt-existing)
@@ -274,6 +300,7 @@ cli_understand_anything_mode="${understand_anything_mode}"
 cli_superpowers_mode="${superpowers_mode}"
 cli_claude_auto_review_mode="${claude_auto_review_mode}"
 record_skills=""
+record_workflow_pack=""
 record_understand_anything=""
 record_superpowers=""
 record_reviewer="none"
@@ -288,6 +315,7 @@ record_claude_auto_review="skipped"
 record_runtime_sha="none"
 
 if [[ "${update_mode}" == true ]]; then
+  [[ ${#project_agents[@]} -eq 0 ]] || { echo "--update preserves project agents; use onboarding to change the selection" >&2; exit 2; }
   command -v python3 >/dev/null || { echo "python3 is required to preserve update metadata" >&2; exit 2; }
   if [[ "${repository_skills_mode}" == install || "${superpowers_mode}" == install ||
         "${understand_anything_mode}" == install || "${governance_observe_mode}" == install ||
@@ -330,6 +358,7 @@ if [[ "${update_mode}" == true ]]; then
   [[ -n "${workflow}" ]] || workflow="$(recorded_selection "${existing_manifest}" '^workflow_id:')"
   claude_auto_review_mode="${record_claude_auto_review}"
   record_skills="${cli_skills_mode:-$(recorded_selection "${existing_manifest}" '^  curated_skills:')}"
+  record_workflow_pack="$(recorded_selection "${existing_manifest}" '^  workflow_pack:')"
   record_understand_anything="${cli_understand_anything_mode:-$(recorded_selection "${existing_manifest}" '^    installation:')}"
   record_superpowers="${cli_superpowers_mode:-$(recorded_selection "${existing_manifest}" '^  installation:')}"
   record_reviewer="$(recorded_selection "${existing_manifest}" '^  reviewer:')"
@@ -508,7 +537,12 @@ if [[ "${create_github}" == false && -n "${github_visibility}" ]]; then
 fi
 
 mkdir -p "${target_dir}"
-target_dir="$(cd "${target_dir}" && pwd)"
+target_dir="$(cd "${target_dir}" && pwd -P)"
+git_root="$(git -C "${target_dir}" rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -n "${git_root}" && "$(cd "${git_root}" && pwd -P)" != "${target_dir}" ]]; then
+  echo "Target is inside another Git repository; review the project boundary first: ${git_root}" >&2
+  exit 1
+fi
 
 files=(
   "templates/AGENTS.md:AGENTS.md"
@@ -520,10 +554,37 @@ files=(
   "templates/skills.gitignore:.agents/skills/.gitignore"
   "templates/sensitive-paths.txt:.agent/governance/sensitive-paths.txt"
 )
+if [[ "${update_mode}" == true ]] && grep -q '^project_agents:' "${existing_manifest}"; then
+  client_record="$(python3 "${repo_root}/scripts/lib/onboarding-project.py" --project "${target_dir}" metadata)" || exit 1
+  while IFS= read -r client; do project_agents+=("${client}"); done < <(printf '%s' "${client_record}" | python3 -c 'import json,sys; print("\n".join(json.load(sys.stdin)["selected"]))')
+fi
+if [[ ${#project_agents[@]} -gt 0 ]]; then
+  include_claude=false
+  for client in "${project_agents[@]}"; do [[ "${client}" != claude-code ]] || include_claude=true; done
+  if [[ "${include_claude}" == false ]]; then
+    selected_files=()
+    for mapping in "${files[@]}"; do
+      [[ "${mapping}" == templates/CLAUDE.md:CLAUDE.md ]] || selected_files+=("${mapping}")
+    done
+    files=("${selected_files[@]}")
+  fi
+fi
 if [[ "${record_governance_observe}" == install ]]; then
   files+=("templates/github/governance-observe.yml:.github/workflows/agent-governance-observe.yml")
   record_runtime_sha="${governance_observe_runtime_sha}"
 fi
+
+# Check every managed destination and parent before any writes, including updates.
+for mapping in "${files[@]}" "manifest:.agent/bootstrap.yml"; do
+  path="${target_dir}/${mapping#*:}"
+  while [[ "${path}" != "${target_dir}" ]]; do
+    if [[ -L "${path}" ]]; then
+      echo "Refusing symbolic-link policy path: ${path}" >&2
+      exit 1
+    fi
+    path="$(dirname "${path}")"
+  done
+done
 
 manifest_path="${target_dir}/.agent/bootstrap.yml"
 managed_records=""
@@ -560,6 +621,14 @@ if [[ "${update_mode}" == true ]]; then
     desired="$(hash_file "${repo_root}/${source}")"
     current="$(hash_file "${destination_path}")"
     recorded="$(recorded_hash "${manifest_path}" "${destination}")"
+
+    # Changing an ignore boundary can expose previously local files. Even
+    # --force does not authorize that migration; use the reviewed helper diff.
+    if [[ "${destination}" == .agents/skills/.gitignore && "${current}" != "${desired}" ]]; then
+      echo "Preserved Skill ignore boundary: ${destination}; review migration with configure-git-ignore.py"
+      [[ -z "${recorded}" ]] || record_managed "${destination}" "${recorded}"
+      continue
+    fi
 
     if [[ "${current}" == "${desired}" ]]; then
       record_managed "${destination}" "${desired}"
@@ -606,6 +675,7 @@ else
 fi
 
 : "${record_skills:=${repository_skills_mode}}"
+: "${record_workflow_pack:=${workflow}}"
 : "${record_understand_anything:=${understand_anything_mode}}"
 : "${record_superpowers:=${superpowers_mode}}"
 
@@ -632,7 +702,7 @@ governance:
   runtime_sha: ${record_runtime_sha}
 components:
   curated_skills: ${record_skills}
-  workflow_pack: ${workflow}
+  workflow_pack: ${record_workflow_pack}
   governance_observe: ${record_governance_observe}
   claude_auto_review: ${record_claude_auto_review}
 integrations:
@@ -650,6 +720,9 @@ superpowers:
 managed_files:
 EOF
 printf '%s' "${managed_records}" >> "${manifest_output}"
+if [[ ${#project_agents[@]} -gt 0 ]]; then
+  python3 -c 'import json,sys; print("project_agents: " + json.dumps(sys.argv[1:]))' "${project_agents[@]}" >> "${manifest_output}"
+fi
 if [[ "${update_mode}" == true ]]; then
   python3 "${repo_root}/scripts/lib/merge-bootstrap-config.py" "${manifest_path}" "${manifest_output}" > "${manifest_output}.merged"
   mv "${manifest_output}.merged" "${manifest_output}"
@@ -675,6 +748,13 @@ if [[ "${configure_github}" == true ]]; then
   "${repo_root}/scripts/configure-github.sh" --repo "${github_repository}"
 fi
 
+skills_agent_flags=()
+ua_agent_flags=()
+if [[ ${#project_agents[@]} -gt 0 ]]; then
+  skills_agent_flags=(--agent "${project_agents[@]}")
+  for client in "${project_agents[@]}"; do ua_agent_flags+=(--agent "${client}"); done
+fi
+
 if [[ "${repository_skills_mode}" == install ]]; then
   if [[ "${workflow}" == github-workflow ]]; then
     echo "github-workflow is active; select it in the Curated Skills selector unless it is already available in another approved scope."
@@ -683,19 +763,19 @@ if [[ "${repository_skills_mode}" == install ]]; then
   # form needs gh/SSH credentials and can also lag behind local edits.
   (
     cd "${target_dir}"
-    npx "skills@${skills_cli_version}" add "${repo_root}"
+    npx "skills@${skills_cli_version}" add "${repo_root}" ${skills_agent_flags[@]+"${skills_agent_flags[@]}"}
   )
 fi
 
 if [[ "${superpowers_mode}" == install ]]; then
   (
     cd "${target_dir}"
-    npx "skills@${skills_cli_version}" add "${superpowers_upstream%.git}/tree/${superpowers_tag}"
+    npx "skills@${skills_cli_version}" add "${superpowers_upstream%.git}/tree/${superpowers_tag}" ${skills_agent_flags[@]+"${skills_agent_flags[@]}"}
   )
 fi
 
 if [[ "${understand_anything_mode}" == install ]]; then
-  "${repo_root}/scripts/install-understand-anything.sh" --target "${target_dir}"
+  "${repo_root}/scripts/install-understand-anything.sh" --target "${target_dir}" ${ua_agent_flags[@]+"${ua_agent_flags[@]}"}
 fi
 
 if [[ "${update_mode}" == true ]]; then
@@ -714,6 +794,9 @@ if [[ "${update_mode}" == true ]]; then
 fi
 
 echo "Initialized Agent project policy in ${target_dir}"
+echo "Git asset policy installed; instruction references and ignore rules still require review."
+echo "Preview: python3 ${repo_root}/scripts/configure-git-ignore.py --project \"${target_dir}\""
+echo "Policy installation does not verify staging, secret scanning, or first publication."
 echo "Selected workflow: ${workflow}"
 if [[ "${create_github}" == false ]] && ! git -C "${target_dir}" remote get-url origin >/dev/null 2>&1; then
   echo "No origin remote configured; bootstrap did not create one."

@@ -39,15 +39,27 @@ for test_file in tests/test-*.sh; do bash "${test_file}"; done
 
 ### Onboarding 与证据
 
-修改 onboarding 时同步检查 `AGENTS.md`、`templates/AGENTS.md`、`policies/workflow-selection.md`、`bootstrap-manifest.yml` 与 [onboarding 指南](examples/onboarding.md)。默认 `bootstrap.sh --target DIR` 是无状态协调向导：每次根据真实项目状态重新检查，不能持久化“跳过/做到第几题”。显式参数旧入口和 `--update` 的边界不可混用。重点验证已有 workflow 不被覆盖或激活、跳过不禁用未知规则、普通 Skills 选择后立即安装、create/connect 不提交或推送，以及 update 保留 metadata 并拒绝安装/Git mutation 参数。
+修改 onboarding 时同步检查 `AGENTS.md`、`templates/AGENTS.md`、`policies/workflow-selection.md`、`bootstrap-manifest.yml` 与 [onboarding 指南](examples/onboarding.md)。默认在用户项目根目录运行工具 checkout 中的 `bootstrap.sh`（不传 `--target`，目标为当前目录），进入本地优先的无状态向导：客户端确认 → 工作方式 → Skills → 项目规范/本地 Git → 本地总结，之后才 opt-in GitHub。不能持久化“跳过/做到第几题”；`project_agents` 是明确的项目偏好，不是权限或安装证明。重点验证每次确认客户端、精确传递原生 argv/TTY、已有 Skills 不取消添加入口、检测不激活、无 GitHub 调用的本地闭环、create/connect 不提交，以及 update 保留 metadata 且不重跑安装。新选择器用 mock PTY 测试方向键/空格/取消/终端恢复；真实 Skills 界面与新客户端会话加载仍需用户终端 UAT，不能从模拟器通过推断。
 
 ```bash
 bash tests/test-policy-text.sh
 ```
 
+修改 README 首次使用入口时，还要运行 `tests/test-onboarding.sh` 中的 README journey 回归：从首页文案和命令顺序出发，模拟获取候选工具到隔离 HOME，进入新/已有项目，不带 `--target` 启动，并确认工具目录未被初始化、项目 origin/暂存区未被误改。离线回归模拟下载和安装，不代表公开 GitHub 已发布候选版本或真实客户端已加载；真实 GitHub clone 与候选覆盖快照的走查结果必须分开报告。
+
 再运行改动对应的 bootstrap/onboarding/GitHub 测试。测试目标、模拟 Git/`gh`、本地验证 key 目录与收据都应放在 `$TMPDIR` 创建的临时目录，不写开发者的真实项目或用户状态目录，不进行真实安装或网络 mutation。新目标必须验证没有凭空出现 `origin`。自动测试可以 mock 安装器，但不能把 Agent PTY 冒充人类终端，也不能清除 Agent 检测变量绕过安全限制。
 
 `scripts/check-bootstrap-evidence.sh --help` 说明当前证据检查接口。报告应分别说明本地验证、远端 CI、review 与保护的实际证据；会话阶段完成、安装选择或本地测试通过，都不能代替远端强制检查。缺少凭据、远端分支或检查结果时，应保留 pending/blocked 和下一步，而不是标记成功。不要把测试环境的模拟安装说成源码仓库已经安装了组件。
+
+### 下游 Git 资产与忽略规则
+
+Git 政策通过 `policies/git.md` 分发，由下游 Agent 入口引用。修改政策、模板或忽略规则时，必须验证共享配置/Skills/锁文件/BMad 正式产物没有被误伤，本地状态有明确排除，既有规则和暂存区未被隐式改写。`--update`（含 `--force`）不迁移旧 Skills 忽略边界；迁移只通过另行确认的精确差异完成。
+
+```bash
+bash tests/test-git-ignore.sh
+```
+
+同时运行 `tests/test-onboarding.sh` 和 `tests/test-create-github.sh`。忽略规则测试使用临时 Git 仓库的真实 `git check-ignore` 结果；发布测试 mock Gitleaks/gh，只验证调用契约和失败边界，不能宣称真实敏感信息扫描或远端发布通过。没有真正运行的首次提交检查必须明确标记未验证。
 
 ### 本仓库的 CI 合并门槛
 

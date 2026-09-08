@@ -50,7 +50,7 @@ python3 "/absolute/skill/path/scripts/installbmad.py" preflight --target "/absol
 python3 "/absolute/skill/path/scripts/installbmad.py" verify --target "/absolute/project/path" --before "/absolute/temporary/path/bmad-before.json"
 ```
 
-仅退出码 0 且 `status=files_verified` 表示文件验收通过。脚本比较版本、模块/工具保留情况，解析 `bmad-help.csv`，检查 BMM 的 PRD/Architecture/Build 标识及 Claude 对应可读 `SKILL.md` 入口；数量只作诊断。其他 AI 工具仍需分别验证其集成，Python 配置解析另见 [运行验证](references/installation.md#运行验证)。非零退出时报告诊断，不伪造缺失文件。
+仅退出码 0 且 `status=files_verified` 表示文件验收通过。脚本比较版本、模块/工具保留情况，解析 `bmad-help.csv`，检查 BMM 的 PRD/Architecture/Build 标识及 Claude/Codex/OpenCode 对应可读 `SKILL.md` 入口，OpenCode 还检查 command pointers；数量只作诊断。未知工具列为未验证，所有客户端仍需新会话确认加载，Python 配置解析另见 [运行验证](references/installation.md#运行验证)。非零退出时报告诊断，不伪造缺失文件。
 
 ## 5. 验证新会话并报告
 

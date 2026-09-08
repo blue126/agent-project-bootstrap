@@ -284,6 +284,94 @@ class InstallBmadTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 2)
                 self.assertFalse(list(self.base.glob('installbmad-live-*')))
 
+    def test_interactive_plan_keeps_union_update_and_roundtrips(self):
+        self.assertEqual(self.plan()['argv'].count('--yes'), 2)
+        self.manifest(('core', 'cis', 'custom-x'), ('codex', 'unknown-tool'))
+        before = self.snapshot()
+        result = helper.preflight(self.target, '6.12.0', ['bmm'], ['opencode'], interactive=True)
+        self.assertNotIn('--yes', result['argv'])
+        self.assertEqual(result['action'], 'update')
+        self.assertEqual(result['expected']['modules'], ['bmm', 'cis', 'core', 'custom-x'])
+        self.assertEqual(result['expected']['tools'], ['codex', 'opencode', 'unknown-tool'])
+        self.assertEqual(self.snapshot(), before)
+        saved = self.base / 'interactive.json'
+        saved.write_text(json.dumps(result))
+        self.assertEqual(helper.load_record(self.target, saved), result)
+        result['interactive'] = 'yes'
+        saved.write_text(json.dumps(result))
+        with self.assertRaises(ValueError):
+            helper.load_record(self.target, saved)
+
+    def test_interactive_cli_does_not_execute_installer(self):
+        result = subprocess.run([sys.executable, '-B', str(skill / 'scripts/installbmad.py'),
+            'preflight', '--interactive', '--target', str(self.target), '--installer-version', '6.12.0',
+            '--modules', 'bmm', '--tools', 'claude-code,codex,opencode'], capture_output=True, text=True, check=True)
+        self.assertNotIn('--yes', json.loads(result.stdout)['argv'])
+        self.assertEqual(list(self.target.iterdir()), [])
+
+    def test_universal_is_not_a_bmad_tool(self):
+        with self.assertRaisesRegex(ValueError, 'not a BMAD tool'):
+            self.plan(tools=('universal',))
+        self.manifest(tools=('universal',))
+        with self.assertRaisesRegex(ValueError, 'not a BMAD tool'):
+            self.plan()
+
+    def test_all_supported_tool_entries_and_unknown_tools(self):
+        tools = ('claude-code', 'codex', 'opencode', 'unknown-tool')
+        before = self.plan(tools=tools)
+        self.installed_files()
+        self.manifest(tools=tools + ('other-installed-tool',))
+        for name in helper.BMM_SKILLS | {'bmad-help'}:
+            self.write(f'.agents/skills/{name}/SKILL.md', 'Shared skill')
+            self.write(f'.opencode/commands/{name}.md', f'---\ndescription: Test\n---\n\n@skills/{name}\n')
+        result = helper.verify(self.target, before)
+        self.assertEqual(result['status'], 'files_verified', result['errors'])
+        self.assertEqual(result['tool_skill_counts'], {'claude-code': 4, 'codex': 4, 'opencode': 4})
+        self.assertEqual(result['tool_integrations_not_verified'], ['other-installed-tool', 'unknown-tool'])
+        for relative in ('.agents/skills/bmad-prd/SKILL.md', '.opencode/commands/bmad-help.md'):
+            path = self.target / relative
+            original = path.read_text()
+            path.unlink()
+            self.assertEqual(helper.verify(self.target, before)['status'], 'failed')
+            path.write_text('')
+            self.assertEqual(helper.verify(self.target, before)['status'], 'failed')
+            path.write_text(original)
+        self.write('.opencode/commands/bmad-help.md', 'Wrong command body')
+        self.assertEqual(helper.verify(self.target, before)['status'], 'failed')
+
+    def test_shared_only_verifies_without_claude_entries(self):
+        before = self.plan(tools=('codex',))
+        self.installed_files()
+        self.manifest(tools=('codex',))
+        shutil.move(self.target / '.claude', self.target / '.agents')
+        result = helper.verify(self.target, before)
+        self.assertEqual(result['status'], 'files_verified', result['errors'])
+        self.assertIsNone(result['claude_skill_count'])
+
+    def test_shared_and_opencode_legacy_evidence(self):
+        for relative in ('.agents/skills/bmad-help', '.opencode/commands/bmad-help.md'):
+            path = self.target / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('Evidence')
+            with self.assertRaisesRegex(ValueError, 'evidence'):
+                self.plan()
+            path.unlink()
+
+    def test_supported_tool_root_and_entry_escape_is_blocked(self):
+        outside = self.base / 'outside'
+        outside.mkdir()
+        self.manifest(tools=('codex', 'opencode'))
+        for relative in ('.agents/skills', '.opencode/commands',
+                         '.agents/skills/bmad-help', '.opencode/commands/bmad-help.md'):
+            path = self.target / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.is_dir():
+                path.rmdir()
+            path.symlink_to(outside)
+            with self.subTest(relative=relative), self.assertRaisesRegex(ValueError, 'escapes'):
+                self.plan(tools=('codex', 'opencode'))
+            path.unlink()
+
     def test_documentation_contract(self):
         main = (skill / 'SKILL.md').read_text()
         # Agent-only consent guards stay visible; executable behavior is tested above.

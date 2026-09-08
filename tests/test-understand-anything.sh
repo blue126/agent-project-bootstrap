@@ -107,6 +107,17 @@ UNDERSTAND_ANYTHING_TEST_PATCH="" \
 grep -q '^    installation: install$' "${bootstrap_target}/.agent/bootstrap.yml"
 test -L "${bootstrap_target}/.agents/skills/understand"
 
+# Explicit client preferences must reach the integration installer too.
+claude_bootstrap_target="${test_root}/bootstrap-claude-project"
+BOOTSTRAP_INTEGRATION_TESTING=1 \
+UNDERSTAND_ANYTHING_TEST_UPSTREAM="${upstream}" \
+UNDERSTAND_ANYTHING_TEST_REF="${fixture_ref}" \
+UNDERSTAND_ANYTHING_TEST_PATCH="" \
+  "${repo_root}/scripts/bootstrap.sh" --target "${claude_bootstrap_target}" \
+    --workflow none --agent claude-code --skip-skills --install-understand-anything >/dev/null
+test -L "${claude_bootstrap_target}/.agents/skills/understand"
+test -L "${claude_bootstrap_target}/.claude/skills/understand"
+
 collision_target="${test_root}/collision"
 mkdir -p "${collision_target}/.agents/skills/understand"
 if BOOTSTRAP_INTEGRATION_TESTING=1 \
@@ -120,5 +131,78 @@ fi
 
 grep -q 'PROJECT_SELF_RELATIVE' "${repo_root}/integrations/understand-anything/patches/project-scope-and-git-hardening.patch"
 grep -q 'rev-parse.*--end-of-options' "${repo_root}/integrations/understand-anything/patches/project-scope-and-git-hardening.patch"
+
+# Client links are additive and never require another clone of a valid runtime.
+fixture_install() {
+  BOOTSTRAP_INTEGRATION_TESTING=1 \
+  UNDERSTAND_ANYTHING_TEST_UPSTREAM="${upstream}" \
+  UNDERSTAND_ANYTHING_TEST_REF="${fixture_ref}" \
+  UNDERSTAND_ANYTHING_TEST_PATCH="" \
+    "${repo_root}/scripts/install-understand-anything.sh" "$@"
+}
+test ! -e "${target}/.claude"
+saved_upstream="${upstream}"
+upstream="${test_root}/does-not-exist"
+fixture_install --target "${target}" --agent claude-code --agent codex --agent opencode --agent universal --agent claude-code >/dev/null
+fixture_install --target "${target}" --agent claude-code >/dev/null
+upstream="${saved_upstream}"
+for name in understand understand-chat; do
+  test -f "${target}/.claude/skills/${name}/SKILL.md"
+  test "$(readlink "${target}/.claude/skills/${name}")" = "$(readlink "${target}/.agents/skills/${name}")"
+done
+cmp "${target}/.agent/runtime/understand-anything/.gitignore" "${test_root}/runtime-ignore-before"
+
+# The last canonical or client collision must not create any earlier links.
+for root in .agents/skills .claude/skills; do
+  for kind in directory file symlink; do
+    collision="${test_root}/late-${root%%/*}-${kind}"
+    mkdir -p "${collision}/${root}"
+    case "${kind}" in
+      directory) mkdir "${collision}/${root}/understand-chat" ;;
+      file) printf 'Keep me\n' > "${collision}/${root}/understand-chat" ;;
+      symlink) ln -s missing "${collision}/${root}/understand-chat" ;;
+    esac
+    if fixture_install --target "${collision}" --agent claude-code > /dev/null 2>&1; then
+      echo "installer unexpectedly accepted ${root} ${kind} collision" >&2; exit 1
+    fi
+    test ! -e "${collision}/.agents/skills/understand"
+    test ! -L "${collision}/.agents/skills/understand"
+    test ! -e "${collision}/.claude/skills/understand"
+    test ! -L "${collision}/.claude/skills/understand"
+    if [[ "${root}" == .claude/skills ]]; then
+      test ! -L "${collision}/.agents/skills/understand-chat"
+    fi
+  done
+done
+
+for directory in .claude .claude/skills .agents .agents/skills; do
+  redirected="${test_root}/redirect-${directory//\//-}"
+  mkdir -p "${redirected}/$(dirname "${directory}")"
+  ln -s "${test_root}/outside" "${redirected}/${directory}"
+  if fixture_install --target "${redirected}" --agent claude-code >/dev/null 2>&1; then
+    echo "installer unexpectedly accepted ${directory} symlink directory" >&2; exit 1
+  fi
+  test ! -e "${redirected}/.agent"
+done
+test -z "$(ls -A "${test_root}/outside")"
+
+for agent in codex opencode universal; do
+  shared="${test_root}/only-${agent}"
+  mkdir -p "${shared}"
+  fixture_install --target "${shared}" --agent "${agent}" >/dev/null
+  test -f "${shared}/.agents/skills/understand/SKILL.md"
+  test ! -e "${shared}/.claude"
+  test ! -e "${shared}/.git"
+done
+invalid="${test_root}/invalid-client"
+mkdir -p "${invalid}"
+for mode in invalid missing; do
+  args=(--agent)
+  [[ "${mode}" != invalid ]] || args+=(invalid)
+  if fixture_install --target "${invalid}" "${args[@]}" >/dev/null 2>&1; then
+    echo "installer unexpectedly accepted ${args[*]}" >&2; exit 1
+  fi
+done
+test -z "$(ls -A "${invalid}")"
 
 echo "Understand Anything integration tests passed"
