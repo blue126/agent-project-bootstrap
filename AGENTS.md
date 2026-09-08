@@ -77,7 +77,7 @@ Never pass `--force` to resolve a reported conflict on your own: it discards the
 - Keep managed integrations pinned to immutable known-good refs; do not fork or vendor upstream source without an explicit decision.
 - Keep workflow frameworks opt-in and mutually exclusive according to `policies/workflow-selection.md`.
 - Treat template `AGENTS.md` as cross-agent policy; template `CLAUDE.md` may contain only Claude-specific additions and must reference `AGENTS.md`.
-- Write Skill instructions and code comments in English unless the Skill intentionally targets Chinese interaction; keep user documentation in Chinese.
+- Write Skill instructions and code comments in English unless the Skill intentionally targets Chinese interaction. Keep `README.md` as the default English entry point and `README.zh-CN.md` as its Chinese counterpart, with reciprocal language links and equivalent commands/safety guidance. Other user documentation remains in Chinese unless explicitly requested otherwise.
 - Put reusable domain material in `references/`; keep deterministic operations in idempotent `scripts/`.
 - Preserve `third-party-sources.yml` compatibility and record source, commit, license, and local modifications before vendoring or forking a Skill.
 - Verify relative references, shell syntax, and bootstrap behavior after every change.

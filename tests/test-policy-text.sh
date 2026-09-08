@@ -37,7 +37,11 @@ grep -q 'post_bootstrap_command: /install-github-app' "${repo_root}/bootstrap-ma
 grep -q 'does not configure GitHub App, authentication, secrets, remotes, providers, or workflows' "${repo_root}/bootstrap-manifest.yml"
 grep -q "does not authorize an Agent to run \`/install-github-app\`" "${repo_root}/AGENTS.md"
 grep -q 'does not authorize GitHub App installation, authentication, secret configuration, remote mutation, or running /install-github-app' "${repo_root}/templates/AGENTS.md"
-grep -q '/install-github-app' "${repo_root}/README.md"
+for readme in README.md README.zh-CN.md; do
+  grep -q '/install-github-app' "${repo_root}/${readme}"
+done
+grep -Fq '[简体中文](README.zh-CN.md)' "${repo_root}/README.md"
+grep -Fq '[English](README.md)' "${repo_root}/README.zh-CN.md"
 grep -q 'Claude Auto Review guidance was selected' "${repo_root}/scripts/bootstrap.sh"
 
 # Local-first onboarding keeps installation, explicit adoption and execution separate.
@@ -76,7 +80,7 @@ grep -Fq 'Skipping does not disable unknown rules' "${repo_root}/templates/AGENT
 grep -Fq 'Never run them in an Agent-owned PTY' "${repo_root}/templates/AGENTS.md"
 grep -Fq "Known values are \`none\`, \`github-workflow\`, \`superpowers\`, and \`bmad\`" "${repo_root}/policies/workflow-selection.md"
 grep -Fq 'Component inventory alone is not activation' "${repo_root}/policies/workflow-selection.md"
-if rg -q -- '--resume|--status|--revisit|BOOTSTRAP_STATE_HOME' "${repo_root}/README.md" "${repo_root}/examples/onboarding.md" "${repo_root}/bootstrap-manifest.yml"; then
+if rg -q -- '--resume|--status|--revisit|BOOTSTRAP_STATE_HOME' "${repo_root}/README.md" "${repo_root}/README.zh-CN.md" "${repo_root}/examples/onboarding.md" "${repo_root}/bootstrap-manifest.yml"; then
   echo 'obsolete onboarding state documentation remains' >&2
   exit 1
 fi

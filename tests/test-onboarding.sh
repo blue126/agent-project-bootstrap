@@ -118,21 +118,34 @@ for client in clients:
         path = self.base / 'calls.jsonl'
         return [json.loads(x) for x in path.read_text().splitlines()] if path.exists() else []
 
-    def readme_toolkit_fixture(self):
+    def readme_toolkit_fixture(self, readme_name='README.md'):
         # Simulate a downloaded candidate distribution, not a published release.
         # This offline regression never fetches packages or runs native installers.
         source = Path(os.environ.get('BOOTSTRAP_JOURNEY_SOURCE', str(root))).resolve()
-        readme = (source / 'README.md').read_text()
-        self.assertLess(readme.index('## 快速开始：初始化项目'), readme.index('## 只想安装 Skills？'))
-        quickstart = readme.split('## 快速开始：初始化项目\n', 1)[1].split('\n## ', 1)[0]
+        translations = {
+            'README.md': ('## Quick start: initialize a project', '## Only want to install Skills?',
+                          ('target defaults to the current working directory',
+                           'toolkit directory and your project directory are different', 'already exists')),
+            'README.zh-CN.md': ('## 快速开始：初始化项目', '## 只想安装 Skills？',
+                                ('默认目标就是当前工作目录', '工具目录和项目目录不是一回事', '已经存在')),
+        }
+        start_heading, skills_heading, explanations = translations[readme_name]
+        readme = (source / readme_name).read_text()
+        english = (source / 'README.md').read_text()
+        chinese = (source / 'README.zh-CN.md').read_text()
+        self.assertIn('[简体中文](README.zh-CN.md)', english)
+        self.assertIn('[English](README.md)', chinese)
+        self.assertEqual(re.findall(r'```bash\n(.*?)\n```', english, re.S),
+                         re.findall(r'```bash\n(.*?)\n```', chinese, re.S))
+        self.assertLess(readme.index(start_heading), readme.index(skills_heading))
+        quickstart = readme.split(start_heading + '\n', 1)[1].split('\n## ', 1)[0]
         commands = re.findall(r'```bash\n(.*?)\n```', quickstart, re.S)
         self.assertEqual(commands, [
             'git clone https://github.com/blue126/agent-project-bootstrap.git "$HOME/agent-project-bootstrap"',
             'mkdir "$HOME/my-agent-project"', 'cd "$HOME/my-agent-project"',
             'cd "/path/to/your/project"', '"$HOME/agent-project-bootstrap/scripts/bootstrap.sh"'])
-        self.assertIn('默认目标就是当前工作目录', quickstart)
-        self.assertIn('工具目录和项目目录不是一回事', quickstart)
-        self.assertIn('已经存在', quickstart)
+        for explanation in explanations:
+            self.assertIn(explanation, quickstart)
         self.toolkit = self.base / 'agent-project-bootstrap'
         self.toolkit.mkdir()
         # Keep a separate toolkit Git repository, as a clone would have. No
@@ -143,15 +156,15 @@ for client in clients:
         for directory in ('scripts', 'templates', 'policies', 'skills', 'integrations'):
             shutil.copytree(source / directory, self.toolkit / directory,
                             ignore=shutil.ignore_patterns('__pycache__', '.venv', 'node_modules'))
-        for name in ('README.md', 'bootstrap-manifest.yml'):
+        for name in ('README.md', 'README.zh-CN.md', 'bootstrap-manifest.yml'):
             shutil.copy2(source / name, self.toolkit / name)
         launch = [arg.replace('$HOME', self.env['HOME']) for arg in shlex.split(commands[-1])]
         self.assertEqual(launch, [str(self.toolkit / 'scripts/bootstrap.sh')])
         self.assertNotIn('--target', launch)
         return commands, launch
 
-    def test_readme_newcomer_download_to_current_directory_journey(self):
-        commands, launch = self.readme_toolkit_fixture()
+    def readme_newcomer_journey(self, readme_name):
+        commands, launch = self.readme_toolkit_fixture(readme_name)
         # Run the README's actual mkdir/cd/start semantics against an isolated HOME.
         mkdir_argv = [arg.replace('$HOME', self.env['HOME']) for arg in shlex.split(commands[1])]
         subprocess.run(mkdir_argv, env=self.env, check=True)
@@ -178,8 +191,8 @@ for client in clients:
         self.assertEqual(toolkit_before, {str(p.relative_to(self.toolkit)): p.read_bytes()
                                          for p in self.toolkit.rglob('*') if p.is_file()})
 
-    def test_readme_existing_project_uses_cwd_and_preserves_index(self):
-        _, launch = self.readme_toolkit_fixture()
+    def readme_existing_project_journey(self, readme_name):
+        _, launch = self.readme_toolkit_fixture(readme_name)
         self.target.mkdir()
         subprocess.run(['git', 'init', '-q', str(self.target)], check=True)
         subprocess.run(['git', '-C', str(self.target), 'remote', 'add', 'origin',
@@ -195,6 +208,18 @@ for client in clients:
                          b'https://github.com/acme/existing.git')
         self.assertFalse((self.target / 'remote-calls').exists())
         self.assertFalse((self.toolkit / '.agent').exists())
+
+    def test_readme_newcomer_download_to_current_directory_journey(self):
+        self.readme_newcomer_journey('README.md')
+
+    def test_chinese_readme_newcomer_journey(self):
+        self.readme_newcomer_journey('README.zh-CN.md')
+
+    def test_readme_existing_project_uses_cwd_and_preserves_index(self):
+        self.readme_existing_project_journey('README.md')
+
+    def test_chinese_readme_existing_project_journey(self):
+        self.readme_existing_project_journey('README.zh-CN.md')
 
     def test_explicit_target_override_still_works_from_another_directory(self):
         text = self.tty(self.answers(), cwd=self.base,

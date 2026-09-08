@@ -1,30 +1,32 @@
 # Agent Project Bootstrap
 
-**为你的项目准备一套可以开始工作的 Agent 开发环境。**
+**English** | [简体中文](README.zh-CN.md)
 
-选择 Agent 客户端、工作流和 Skills，建立项目规范与本地 Git，然后在所选客户端开始第一个任务。新项目和已有项目都可使用；已有配置会保留，必要变更先说明，**不自动提交或推送**。GitHub、CI 和自动审查是后续可选能力，不是本地开工的前置条件。
+**Set up an agent coding environment that is ready to start work.**
 
-**第一次使用？从下面的「快速开始」走完整流程。** 只想添加几个技能、不需要项目初始化时，再看[只安装 Skills](#只想安装-skills)。
+Choose your agent clients, workflow, and Skills; establish project policies and local Git; then start your first task in your selected client. Works with both new and existing projects. Existing configuration is preserved, changes are explained before they happen, and **nothing is committed or pushed automatically**. GitHub, CI, and automated review are optional next steps—not prerequisites for working locally.
 
-## 快速开始：初始化项目
+**First time here? Follow the full quick start below.** If you only want a few skills rather than project initialization, see [Skills-only installation](#only-want-to-install-skills).
 
-使用 macOS/Linux 的普通终端。基础向导需要 **Bash、Git、jq、Python 3.9+**；选择安装 Skills/工作流时还需要相应的 Node.js/npm/npx 环境。GitHub 续程才需要已登录的 `gh`。缺少依赖会明确停止或提示，不会自动安装到你的全局环境。
+## Quick start: initialize a project
 
-请由你本人在 Terminal.app、iTerm 等终端运行。不要让 Agent 用工具 PTY 代跑真实安装器，也不要清除 `AI_AGENT`、`CLAUDECODE`、`CODEX_*` 等检测变量来绕过限制。
+Use a regular terminal on macOS or Linux. The basic wizard requires **Bash, Git, jq, and Python 3.9+**. Installing Skills or workflow components also requires the appropriate Node.js/npm/npx environment. An authenticated `gh` is needed only for the optional GitHub continuation. Missing dependencies are reported; the toolkit does not automatically install them into your global environment.
 
-### 1. 获取 bootstrap 工具
+Run the commands yourself in Terminal.app, iTerm, or another regular terminal. Do not have an agent launch real interactive installers in a tool-owned PTY, or clear detection variables such as `AI_AGENT`, `CLAUDECODE`, or `CODEX_*` to bypass the guard.
 
-以下示例把**工具仓库**放在你的主目录下；这一步只是下载工具，还没有初始化你的项目：
+### 1. Get the bootstrap toolkit
+
+This example places the **toolkit repository** in your home directory. It only downloads the toolkit; it does not initialize your project:
 
 ```bash
 git clone https://github.com/blue126/agent-project-bootstrap.git "$HOME/agent-project-bootstrap"
 ```
 
-如果这个目录已经存在，先确认它是不是你原有的工具 checkout；可以直接复用，不要覆盖或删除。若工具放在其他位置，后面把启动脚本的路径换成它的实际位置即可。
+If that directory already exists, first check whether it is your existing toolkit checkout. Reuse it rather than overwriting or deleting it. If the toolkit is stored elsewhere, substitute its actual script path in the commands below.
 
-### 2. 进入你自己的项目目录
+### 2. Enter your own project directory
 
-**新项目**可以先建一个空目录。`my-agent-project` 是示例项目名，可以换成你想用的名称；如果目录已存在，按已有项目处理，不要清空它：
+For a **new project**, create an empty directory. `my-agent-project` is an example name; replace it as needed. If the directory already exists, treat it as an existing project—do not empty it:
 
 ```bash
 mkdir "$HOME/my-agent-project"
@@ -34,76 +36,76 @@ mkdir "$HOME/my-agent-project"
 cd "$HOME/my-agent-project"
 ```
 
-**已有项目**不需要新建目录，只需进入它的项目根目录；把下面的路径替换成你的真实项目路径：
+For an **existing project**, do not create another directory. Enter its project root instead, replacing the path below with your actual project path:
 
 ```bash
 cd "/path/to/your/project"
 ```
 
-> **工具目录和项目目录不是一回事。** 不要因为刚下载了工具，就在 `agent-project-bootstrap` 仓库里启动初始化。先进入真正要开发的项目；已有 Git 项目应进入 Git 根目录，不是其中的子目录。
+> **The toolkit directory and your project directory are different.** Do not start project initialization inside the `agent-project-bootstrap` checkout just because you downloaded it there. Enter the project you intend to develop. For an existing Git project, use its Git root rather than a subdirectory.
 
-### 3. 在当前项目启动向导
+### 3. Start the wizard in the current project
 
 ```bash
 "$HOME/agent-project-bootstrap/scripts/bootstrap.sh"
 ```
 
-**无需传目录参数：默认目标就是当前工作目录。** 开场会显示目标项目的实际路径，先核对它，再选择开始。这里只运行位于工具仓库里的脚本，不会把当前目录切换回工具仓库。
+**No directory argument is needed: the target defaults to the current working directory.** The opening screen displays the actual target path; check it before starting. Invoking the script from the toolkit does not change your working directory back to the toolkit checkout.
 
-向导需要真人交互终端；客户端多选使用方向键、空格和 Enter，`q` 可取消。原生 Skills 安装器保留搜索、多选、安装作用域和复制/链接选择，推荐项目级 `Project`。不使用 `--all`、`-y` 或 `-g` 替你省略这些决定。
+The wizard requires a human-operated interactive terminal. Use arrow keys, Space, and Enter for client selection; `q` cancels. The native Skills installer retains its search, multiselect, scope, and copy/symlink choices. Project-level `Project` scope is recommended. Do not use `--all`, `-y`, or `-g` to skip these decisions on the user's behalf.
 
-### 4. 完成后开始工作
+### 4. Start working after setup
 
-向导会显示客户端、工作方式、实际 Skill 入口、项目规则与 Git 状态，以及第一个任务的起步指引。
+The summary shows your clients, workflow, actual Skill entries, project policies, and Git state, together with guidance for your first task.
 
-在**所选客户端的新会话**中打开这个项目，先确认 Agent 读取到项目规则和 Skills，再授权第一项开发任务。文件安装成功不等于客户端已经加载；尚未提交的资产也会明确标为只在本地。第一次提交仍需审阅文件范围与敏感信息。
+Open the project in a **new session of your selected client**. Confirm that the agent has read the project policies and discovered the Skills before authorizing development. Installed files do not prove that the client has loaded them. Uncommitted assets are explicitly reported as local-only; the first commit still requires file-scope and sensitive-information review.
 
-不需要 GitHub 时，在最后选择结束即可。以后想添加客户端、Skills 或协作能力，在同一项目目录重新运行上面的命令；已有内容重新检查，不恢复某个“做到第几题”的隐藏进度。
+If you do not need GitHub, finish at the final prompt. To add clients, Skills, or collaboration capabilities later, rerun the same command from the project directory. Existing state is reinspected; the wizard does not resume a hidden “last completed question.”
 
-## 向导中会发生什么
+## What the wizard does
 
-| 阶段 | 你要决定什么 | 项目会得到什么 |
+| Stage | Your decision | What the project receives |
 |---|---|---|
-| 1. Agent 客户端 | Claude Code、Codex、OpenCode 或 Universal，可多选 | 明确的项目安装目标；已有记录只预选，不替你确认 |
-| 2. 工作方式 | 保留现有方法，或明确采用 github-workflow、Superpowers、BMAD | 一套选定的方法；检测或安装不自动执行任务 |
-| 3. Skills 与可选能力 | 安装工作流所需内容、添加普通 Skills、可选 Understand Anything | 客户端可发现的项目入口；已有 Skill 也能继续添加 |
-| 4. 项目规范与本地 Git | 确认必要配置、忽略规则差异，以及是否初始化本地 Git | 共享 Agent 规范、Git 资产政策和本地仓库；不提交、不推送 |
-| 5. 本地总结 | 核对就绪和待处理项，决定是否继续 GitHub | 首个任务指引；无需先配置 CI 才能结束基础流程 |
+| 1. Agent clients | Claude Code, Codex, OpenCode, or Universal; multiple selections allowed | Explicit project installation targets; saved choices are preselected, not automatically confirmed |
+| 2. Workflow | Keep your existing approach, or explicitly adopt github-workflow, Superpowers, or BMAD | A selected working method; detection or installation does not execute tasks |
+| 3. Skills and optional tools | Install workflow components, add ordinary Skills, optionally install Understand Anything | Project entries discoverable by the selected clients; existing Skills do not prevent additions |
+| 4. Project policies and local Git | Confirm configuration, ignore-rule changes, and local Git initialization | Shared agent policies, Git asset rules, and a local repository; no automatic commits or pushes |
+| 5. Local summary | Check readiness and pending items; decide whether to continue with GitHub | First-task guidance; CI setup is not required to finish the basic flow |
 
-开场 `i` 可以查看完整的 **检查 / 可能改变 / 不会** 说明。说明页不启动安装或写入项目。`NO_COLOR`、窄终端和 `TERM=dumb` 提供可读回退，但不会让非交互 Agent 进程变成人类终端。
+At the opening prompt, `i` displays the full **Checks / Possible changes / Will not do** explanation. Reading this page does not launch installers or write project files. `NO_COLOR`, narrow terminals, and `TERM=dumb` have readable fallbacks, but do not turn an agent-owned process into a human terminal. The wizard currently displays Chinese guidance; changing the README language does not change the terminal UI language.
 
-- **客户端选择每次都出现**。后续 Skills 调用复用你选择的 `--agent`，原生 scope/method/确认仍可能按每次安装分别出现。当前 `skills@1.5.23 add` 没有 `--project` 参数；不能靠 `-y/--all` 强行隐藏提问。选择 Global 不代表项目入口就绪。
-- **工作流只采用一种**。`github-workflow` 适合 Git 分支/审阅与之后的 GitHub 协作；Superpowers 适合功能设计、实现和验证；BMAD 适合需求、架构和系统性迭代。保留现有方法不会停用未知规则，也不要求你为未知框架分类。
-- **Understand Anything 可跳过**。已有代码库（brownfield）通常更能受益，空项目（greenfield）可以等有代码后再用。它安装固定版本 runtime 和项目链接，不装全局插件、不自动分析；后续分析可能产生模型费用。
-- **先本地、后协作**。本地总结后才询问 GitHub；拒绝后没有 CI/Review/Ruleset 问卷。即使已有 GitHub origin，此前也不调用 `gh` 访问它。
+- **Client selection appears on every run.** Subsequent Skills calls reuse your selected `--agent` targets. Native scope, installation-method, and confirmation prompts may still appear for each installation. `skills@1.5.23 add` has no `--project` flag; do not hide prompts using `-y` or `--all`. Selecting Global does not establish project-local readiness.
+- **Adopt one workflow.** `github-workflow` covers Git branches, review, and later GitHub collaboration; Superpowers covers feature design, implementation, and validation; BMAD covers requirements, architecture, and structured iteration. Keeping your existing approach does not disable unknown rules or require classifying an unknown framework.
+- **Understand Anything is optional.** Existing codebases (brownfield) usually benefit more; empty projects (greenfield) can wait until there is code to analyze. It installs a pinned runtime and project links, not global plugins. It does not automatically analyze code; later analysis may incur model costs.
+- **Local setup comes before collaboration.** GitHub is offered only after the local summary. Declining ends the flow without a CI/review/ruleset questionnaire. Even an existing GitHub origin is not contacted through `gh` before that opt-in.
 
-客户端路径与兼容范围：
+Client paths and compatibility:
 
-| 客户端/模式 | 项目 Skill 路径 | 说明 |
+| Client or mode | Project Skill path | Notes |
 |---|---|---|
-| Claude Code | `.claude/skills/` | 通过 `CLAUDE.md` 引用共享 `AGENTS.md` |
-| Codex | `.agents/skills/` | 使用项目共享 Skill 目录 |
-| OpenCode | `.agents/skills/` | BMAD 还需 `.opencode/commands` pointers |
-| Universal | `.agents/skills/` | 共享目录模式，不是客户端应用，也不是安装全部客户端；BMAD 6.12.0 不支持此 tool ID |
+| Claude Code | `.claude/skills/` | `CLAUDE.md` references the shared `AGENTS.md` |
+| Codex | `.agents/skills/` | Uses the shared project Skill directory |
+| OpenCode | `.agents/skills/` | BMAD also requires `.opencode/commands` pointers |
+| Universal | `.agents/skills/` | Shared-directory mode, not a client application or “install all”; BMAD 6.12.0 does not support this tool ID |
 
-更多交互和已有项目说明见[起步指南](examples/onboarding.md)。
+See the [onboarding guide (Chinese)](examples/onboarding.md) for more interaction details and existing-project guidance.
 
-## 只想安装 Skills？
+## Only want to install Skills?
 
-**这是独立的 Skills-only 入口，不会建立完整的项目规范或 Git 环境。** 如果想 bootstrap 一个项目，使用上面的[快速开始](#快速开始初始化项目)。
+**This is a separate Skills-only entry point. It does not establish the complete project policies or Git environment.** To bootstrap a project, use the [quick start](#quick-start-initialize-a-project) instead.
 
-先进入希望安装 Skills 的项目，再运行：
+Enter the project where you want to install Skills, then run:
 
 ```bash
 npx skills add https://github.com/blue126/agent-project-bootstrap
 ```
 
-不必先 clone 工具仓库。原生安装器负责 Skill、客户端、作用域和安装方式；它可能根据环境省略不适用的问题。不要把 Skills 安装结束当成整个项目初始化完成。
+You do not need to clone the toolkit first. The native installer handles Skill, client, scope, and installation-method choices; it may omit questions that do not apply to the detected environment. Completing Skill installation is not the same as completing project initialization.
 
 <details>
-<summary>维护者：从本地 checkout 安装、列出或链接 Skills</summary>
+<summary>Maintainers: install, list, or link Skills from a local checkout</summary>
 
-以下假设工具已按快速开始下载到主目录。安装仍从目标项目运行：
+These examples assume the toolkit was downloaded to your home directory as in the quick start. Run installation from the target project:
 
 ```bash
 npx skills@1.5.23 add "$HOME/agent-project-bootstrap"
@@ -113,7 +115,7 @@ npx skills@1.5.23 add "$HOME/agent-project-bootstrap"
 npx skills@1.5.23 add "$HOME/agent-project-bootstrap" --list
 ```
 
-只有明确要创建用户级链接时才使用下面的工具；它不是默认项目 bootstrap 路径：
+Use the following tool only when user-level links are explicitly wanted. It is not the default project bootstrap path:
 
 ```bash
 "$HOME/agent-project-bootstrap/scripts/link-skills.sh"
@@ -125,70 +127,70 @@ npx skills@1.5.23 add "$HOME/agent-project-bootstrap" --list
 
 </details>
 
-## 更新与恢复
+## Updating and restoring
 
-### 升级已 bootstrap 的项目
+### Update a bootstrapped project
 
-仍然先进入目标项目目录。只刷新没有被你修改过的受管文件：
+First enter the target project directory. Refresh only managed files you have not modified:
 
 ```bash
 "$HOME/agent-project-bootstrap/scripts/bootstrap.sh" --update
 ```
 
-Bootstrap 在目标 `.agent/bootstrap.yml` 记录受管文件哈希。你修改过的文件会保留并列出；客户端偏好、现有选择与未知 metadata 也保留。`--update` 不重跑安装器，不开始向导，不授权 Git 或远端操作。需要覆盖自己的修改时，先看 diff，再由用户明确决定是否使用 `--force`；它也不会悄悄打开旧 Skills 的忽略边界。
+Bootstrap records managed-file hashes in the project's `.agent/bootstrap.yml`. Modified files are preserved and listed, as are client preferences, existing selections, and unknown metadata. `--update` does not rerun installers, start the wizard, or authorize Git or remote operations. If you need to replace your own edits, inspect the diff and explicitly decide whether to use `--force`; even that flag does not silently open a legacy Skills ignore boundary.
 
-### 新机器上恢复本地产物
+### Restore local artifacts on a new machine
 
-项目自有/定制 Skills 应经审阅提交；第三方内容可以按许可选择提交，或通过固定版本、可验证的流程复现。不是所有已安装 Skills 都属于应忽略的临时产物。
+Project-owned or customized Skills should be reviewed and committed. Third-party content may be committed where licensing permits, or reproduced through a pinned, verifiable process. Not every installed Skill is a disposable local artifact.
 
-获取工具、clone 你的项目并进入项目目录后：
+After obtaining the toolkit, cloning your project, and entering its directory:
 
 ```bash
 "$HOME/agent-project-bootstrap/scripts/rehydrate.sh"
 ```
 
-工具按记录重建可恢复的 Understand Anything runtime/客户端入口，打印需要你在普通终端执行的 Skills/Superpowers 命令，并如实列出 BMAD 等人工待办。安装事实、版本来源和新会话加载不能仅凭一条安装记录推断。
+The tool uses recorded configuration to rebuild supported Understand Anything runtimes and client entries, prints Skills/Superpowers commands you must run in a regular terminal, and lists manual BMAD or other pending work honestly. Installation facts, version provenance, and new-session loading cannot be inferred from a single installation record.
 
-## 下游项目的版本控制规范
+## Version-control policies for downstream projects
 
-`policies/git.md` 会分发为下游 `.agent/policies/git.md`，由项目 `AGENTS.md` 要求 Agent 在初始化、暂存、提交、修改忽略规则或清理前读取；无需另装一个 Skill。
+`policies/git.md` is distributed as `.agent/policies/git.md` in the target project. The project's `AGENTS.md` requires agents to read it before initialization, staging, committing, changing ignore rules, or cleanup; no additional Skill is needed.
 
-- **项目能力进 Git**：共享配置、Skills、agents、commands、hooks、工作流、依赖锁文件，以及正式需求/设计/研究/脱敏验证记录。提交前检查敏感信息、可移植性和许可；共享自动化按代码审查。
-- **个人状态留本机**：凭据、个人覆盖、会话、缓存和嵌套 worktree。runtime 使用局部忽略规则，已确认可重建的链接按精确路径提出排除建议。
-- **已有规则保留**：缺少根 `.gitignore` 时生成最小规则；已有文件只追加经确认的内容。过宽规则遮蔽资产时报告，不自动删除规则或取消跟踪；`.gitignore` 不是敏感信息扫描器。
-- **旧 Skills 边界另行迁移**：`--update`（包括 `--force`）保留已有不同内容的 Skills 忽略文件。向导单独显示旧整目录忽略的迁移及受影响候选，再确认应用；自定义内容不自动迁移。
-- **验收分开**：政策安装、规则应用、客户端加载、首次提交验证和远端发布是不同状态。完整政策见 [Git 政策](policies/git.md)。
+- **Put project capabilities in Git:** shared configuration, Skills, agents, commands, hooks, workflows, dependency lockfiles, and formal requirements, designs, research, or sanitized validation records. Review sensitive content, portability, and licensing before committing; review shared automation as code.
+- **Keep personal state local:** credentials, personal overrides, sessions, caches, and nested worktrees. Runtime directories use local ignore rules; links confirmed to be reproducible receive exact-path exclusion proposals.
+- **Preserve existing rules:** generate a minimal root `.gitignore` if it is absent, or append only confirmed changes to an existing file. Report overly broad rules that hide assets rather than deleting rules or untracking files automatically. `.gitignore` is not a secret scanner.
+- **Migrate legacy Skills boundaries separately:** `--update`, including `--force`, preserves differing existing Skills ignore files. The wizard separately shows the legacy whole-directory-ignore migration and affected candidates, then requests confirmation. Custom rules are not migrated automatically.
+- **Keep acceptance stages separate:** policy installation, rule application, client loading, first-commit validation, and remote publication are different states. See the complete [Git policy](policies/git.md).
 
 <details>
-<summary>高级：单独预览或应用忽略规则</summary>
+<summary>Advanced: preview or apply ignore rules separately</summary>
 
 ```bash
 python3 "$HOME/agent-project-bootstrap/scripts/configure-git-ignore.py" --project "$PWD"
 ```
 
-确认精确 diff 后，用输出的 snapshot token 替换 `TOKEN` 才能应用。过期快照会拒绝写入：
+After reviewing the exact diff, replace `TOKEN` with the reported snapshot token to apply it. Stale snapshots are rejected:
 
 ```bash
 python3 "$HOME/agent-project-bootstrap/scripts/configure-git-ignore.py" --project "$PWD" --apply --expect TOKEN
 ```
 
-旧 Skills 迁移须在预览和应用两步都显式加 `--migrate-skills`。这个专用 helper 的 `--project` 不同于主向导可省略的 `--target`。
+Legacy Skills migration requires `--migrate-skills` in both the preview and application commands. This helper's required `--project` differs from the main wizard's optional `--target`.
 
 </details>
 
-## 可选 GitHub 协作
+## Optional GitHub collaboration
 
-基础总结之后可以继续创建/连接 GitHub，再按需要准备本地验证、CI、自动审查和合并保护。没有远端分支或真实证据时保留 pending/blocked，不用“成功”占位符替代测试。
+After the local summary, you can create or connect a GitHub repository, then prepare local validation, CI, automated review, and merge protection as needed. Missing remote branches or real evidence remain pending/blocked; a placeholder “success” cannot substitute for tests.
 
-Claude Auto Review 需要用户在项目的 Claude Code 会话运行官方 `/install-github-app`。选择引导不授权 Agent 安装 App、设置认证/secret、启用自动合并或批准代码。治理敏感改动由人工处理。
+Claude Auto Review requires the user to run the official `/install-github-app` in the project's Claude Code session. Selecting guidance does not authorize an agent to install the App, configure authentication or secrets, enable auto-merge, or approve code. Governance-sensitive changes require human handling.
 
-已有审查结果时，输入明确的 PR 编号验证当前版本的 bot 反馈，验证通过后可继续保护步骤，不会反复要求安装。这个结果只证明自动审查反馈可用，不代表合并批准，也不证明反馈来自特定 Claude App；没有 PR 时可选择查看安装指引或暂不验证。
+If review results already exist, enter an explicit PR number to verify bot feedback on its current revision. Successful verification continues to protection setup instead of repeatedly handing off installation. This verifies feedback availability only—not merge approval or the identity of a particular Claude App. Without a PR, you can view installation guidance or skip verification for now.
 
-如果用户明确请求项目 Agent 协助准备验证，才在 `.agent/runtime/onboarding/` 生成结构化 handoff。它是任务文件，不是 resume 状态或执行授权；完成外部工作后重新运行主入口，根据实际证据继续。
+A structured handoff is created under `.agent/runtime/onboarding/` only when the user explicitly asks a project agent to help prepare validation. It is a task file, not resume state or execution authorization. After external work, rerun the main entry point to continue based on actual evidence.
 
-### 创建 GitHub repository
+### Create a GitHub repository
 
-默认向导只创建或连接，不发布代码。需要单独调用底层工具时，明确项目与仓库：
+The default wizard creates or connects repositories without publishing code. When calling the underlying tools separately, specify both the project and repository:
 
 ```bash
 "$HOME/agent-project-bootstrap/scripts/create-github.sh" --source "$PWD" --repo owner/repository --visibility private --create-only
@@ -198,56 +200,56 @@ Claude Auto Review 需要用户在项目的 Claude Code 会话运行官方 `/ins
 "$HOME/agent-project-bootstrap/scripts/create-github.sh" --source "$PWD" --repo owner/existing-repository --attach-only
 ```
 
-两种模式都不暂存、不提交、不推送，不替换冲突的 `origin`。仓库名、创建可见性和实际操作要明确确认；之后发布代码仍需独立授权。
+Neither mode stages, commits, pushes, or replaces a conflicting `origin`. Confirm the repository name, creation visibility, and operation explicitly. Publishing code later still requires separate authorization.
 
-### 配置 GitHub main 保护
+### Configure GitHub main protection
 
-在项目远端与分支已存在，且已授权这一远端变更时：
+Once the remote project and branch exist, and this remote change has been authorized:
 
 ```bash
 "$HOME/agent-project-bootstrap/scripts/configure-github.sh" --repo owner/repository
 ```
 
-幂等配置 Protect main 基础 Ruleset，要求 PR、解决审查线程并采用 squash，不要求正数审批票。项目 CI gates 基于下游自己的实际 evidence；本仓库的 self profile 不是下游默认设置。初始 governance 为 `validation: pending`、`auto_merge: disabled`，不会默认开启自动合并。
+This idempotently configures the baseline Protect main ruleset: pull requests, resolved review threads, and squash merges, without requiring a positive approval count. Project CI gates use the downstream project's own evidence; this repository's self profile is not the downstream default. Governance starts with `validation: pending` and `auto_merge: disabled`; auto-merge is not enabled by default.
 
 <details>
-<summary>高级：显式参数、其他目标目录与旧发布入口</summary>
+<summary>Advanced: explicit options, other target directories, and legacy publication</summary>
 
-**只有操作当前目录之外的项目，才需要主入口的 `--target`：**
+**Use the main entry point's `--target` only when operating on a project outside your current directory:**
 
 ```bash
 "$HOME/agent-project-bootstrap/scripts/bootstrap.sh" --target "/path/to/another/project"
 ```
 
-只有用户已经明确给出全部选择时，才使用有界参数入口；Agent 不应为绕过交互而索要配置字符串：
+Use the bounded explicit-options entry point only when the user has already specified all choices. Agents should not request a configuration string just to bypass interaction:
 
 ```bash
 "$HOME/agent-project-bootstrap/scripts/bootstrap.sh" --workflow github-workflow --skip-skills --skip-understand-anything --skip-claude-auto-review
 ```
 
-`--install-skills` / `--install-superpowers` 要求真实交互终端，Superpowers 安装前验证固定 tag 对应 known-good commit。明确配置项目 adapter 时，使用项目自己的验证入口；公共 runtime 不捆绑技术栈适配器，也不接受口头结果替代 evidence：
+`--install-skills` and `--install-superpowers` require a real interactive terminal. Superpowers installation verifies the pinned tag against its known-good commit first. When configuring a project adapter, use the project's own validation entry point. The public runtime bundles no technology-stack adapters and does not accept verbal claims as evidence:
 
 ```bash
 "$HOME/agent-project-bootstrap/scripts/configure-validation.sh" --project "$PWD" --manifest .agent/validation/adapter.json --mode shadow
 ```
 
-**旧发布模式会创建提交并上传代码，不是基础向导。** 仅在用户明确授权这些行为、审阅文件范围并完成发布前检查后才使用：
+**Legacy publication creates a commit and uploads code; it is not the basic wizard.** Use it only after the user explicitly authorizes these actions, reviews the file scope, and completes pre-publication checks:
 
 ```bash
 "$HOME/agent-project-bootstrap/scripts/bootstrap.sh" --workflow github-workflow --skip-skills --skip-understand-anything --skip-claude-auto-review --create-github --github-repo owner/repository --github-visibility private
 ```
 
-它仅自动暂存 bootstrap 骨架（含已审阅的根 `.gitignore`），拒绝未审阅的其他改动或已有暂存内容。发布前用临时 index 检查候选树，拒绝不安全链接/嵌套仓库、超过 10 MiB 的当前文件以及无效 JSON/YAML/TOML/Shell 语法；YAML 需 PyYAML，TOML 需 Python 3.11+。本地 Gitleaks 8.19+ 必须扫描候选内容及已有 main 历史；缺扫描器、浅历史、扫描失败均停止，不自动安装依赖。
+It automatically stages only the bootstrap skeleton, including a reviewed root `.gitignore`, and rejects unrelated unreviewed changes or pre-existing staged content. A temporary index is used to check the candidate tree before publication. Unsafe links, nested repositories, current files over 10 MiB, and invalid JSON/YAML/TOML/Shell syntax are rejected. YAML checks require PyYAML; TOML requires Python 3.11+. Local Gitleaks 8.19+ must scan the candidate content and existing main history. A missing scanner, shallow history, or failed scan stops publication without automatically installing dependencies.
 
-不允许通过项目 ignore/allow 注释静默缩减该扫描；活动 hooks 需走项目正常发布路径，不为了发布绕过 hooks。检查失败不改变真实 index，检查通过也不等于证明不存在秘密或完成应用 schema/业务验证。
+Project ignore/allow comments cannot silently narrow that scan. Projects with active hooks must use their normal publication workflow; hooks are not bypassed to publish. Failed checks leave the real index unchanged. Passing checks does not prove the absence of secrets or replace application-schema and functional validation.
 
 </details>
 
-## 项目结构与维护
+## Project structure and maintenance
 
-- `AGENTS.md` 是共享政策入口；选择 Claude 时用 `CLAUDE.md` 引用它。
-- `.agent/policies/` 放下游项目规范，`.agent/bootstrap.yml` 记录明确偏好、受管文件哈希与可验证的安装信息，不存向导进度或授权。
-- Understand Anything 使用固定 `v2.9.0` / immutable ref 的项目 runtime 和兼容补丁；Superpowers 使用受管的 `v6.3.0` / immutable ref；BMAD 安装和工作流执行分开。
-- 其他第三方来源、许可和定制见 `third-party-sources.yml`；受管集成见 `integrations/`。`human-3-development-assessor` 无上游许可证，只提供 `Visit upstream`，不捆绑、复制、patch、自动下载或一键安装。
+- `AGENTS.md` is the shared policy entry point; when Claude is selected, `CLAUDE.md` references it.
+- `.agent/policies/` contains downstream project policies. `.agent/bootstrap.yml` records explicit preferences, managed-file hashes, and verifiable installation information—not wizard progress or authorization.
+- Understand Anything uses a project runtime pinned to `v2.9.0` and an immutable ref, plus compatibility patches. Superpowers uses managed `v6.3.0` and an immutable ref. BMAD installation is separate from workflow execution.
+- Other third-party provenance, licensing, and customization are recorded in `third-party-sources.yml`; managed integrations live in `integrations/`. `human-3-development-assessor` has no upstream license and is listed as `Visit upstream` only: it is not bundled, copied, patched, automatically downloaded, or installed with one click.
 
-本仓库是工具分发源码，不代表本 checkout 已安装或启用了组件。自身代码使用 MIT；bundled third-party 内容保留原许可证，见 [第三方声明](THIRD_PARTY_NOTICES.md)。维护、测试与打包见[贡献指南](CONTRIBUTING.md)。不要提交凭据、个人状态或私密转录；正式项目报告应经审阅、脱敏和许可检查后保留。
+This repository distributes toolkit source; it does not mean components are installed or active in this checkout. Original project code is MIT-licensed; bundled third-party content retains its original licenses—see [third-party notices](THIRD_PARTY_NOTICES.md). See the [contribution guide (Chinese)](CONTRIBUTING.md) for maintenance, testing, and packaging. Do not commit credentials, personal state, or private transcripts. Preserve formal project reports after review, sanitization, and license checks.
