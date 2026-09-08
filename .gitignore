@@ -13,3 +13,11 @@ transcripts/
 *.local.*
 __pycache__/
 *.pyc
+
+# Local Claude state; shared .claude configuration remains reviewable.
+/.claude/.cc-writes/
+/.claude/settings.local.json
+/.claude/worktrees/
+
+# Private historical checkout with independent Git history and artifacts.
+/archived/agent-project-bootstrap-private/
