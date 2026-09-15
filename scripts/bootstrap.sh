@@ -801,11 +801,11 @@ echo "Selected workflow: ${workflow}"
 if [[ "${create_github}" == false ]] && ! git -C "${target_dir}" remote get-url origin >/dev/null 2>&1; then
   echo "No origin remote configured; bootstrap did not create one."
 fi
-if [[ "${update_mode}" == false && "${workflow}" == superpowers && "${superpowers_mode}" == skip ]]; then
+if [[ -z "${BOOTSTRAP_COORDINATED:-}" && "${update_mode}" == false && "${workflow}" == superpowers && "${superpowers_mode}" == skip ]]; then
   echo "Superpowers is active but project installation was skipped by explicit choice."
   echo "Confirm that pinned v6.3.0 is available through another approved scope before using the workflow."
 fi
-if [[ "${update_mode}" == false && "${workflow}" == github-workflow && "${repository_skills_mode}" == skip ]]; then
+if [[ -z "${BOOTSTRAP_COORDINATED:-}" && "${update_mode}" == false && "${workflow}" == github-workflow && "${repository_skills_mode}" == skip ]]; then
   echo "github-workflow is active but Curated Skills installation was skipped by explicit choice."
   echo "Confirm that github-workflow is available through another approved scope before using it."
 fi

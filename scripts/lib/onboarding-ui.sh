@@ -21,7 +21,6 @@ ui_section() { printf '\n  %s%s%s\n\n' "${ui_bold:-}" "$1" "${ui_reset:-}"; }
 ui_text() { printf '  %s\n' "$@"; }
 ui_note() { printf '  %s%s%s\n' "${ui_muted:-}" "$1" "${ui_reset:-}"; }
 ui_warning() { printf '\n  %s! %s%s\n' "${ui_warning_color:-}" "$1" "${ui_reset:-}"; }
-ui_label() { printf '    %s%s%s %s\n' "${ui_bold:-}" "$1" "${ui_reset:-}" "$2"; }
 
 ui_stage_card() {
   printf '\n  %s[%s/5] %s%s\n' "${ui_bold:-}" "$1" "$2" "${ui_reset:-}"
@@ -38,45 +37,50 @@ ui_overview() {
   ui_stage_card 3 'Skills 与可选能力' '原生搜索、多选和安装界面；已有 Skills 也能继续添加。'
   ui_stage_card 4 '项目规范与本地 Git' '建立规则、审阅忽略差异、初始化本地 Git，不提交或推送。'
   ui_stage_card 5 '开始工作' '检查本地入口，说明待确认项，并给出首个任务的起步方式。'
-  ui_note '基础流程完成后，可选择继续 GitHub、CI、审查和保护；也可以直接开始本地工作。'
+  ui_note '基础流程完成后，可选择建立 GitHub CI 与协作保障；也可以直接开始本地工作。'
   ui_section '重要边界'
   ui_text '• 每次运行重新检查真实项目状态；中断后直接重跑同一命令。' \
     '• 外部写入、发布、权限与覆盖操作都会在执行前单独确认。' \
     '• 不会自动提交、推送、创建 PR 或合并代码。'
 }
 
-ui_detail_stage() {
-  ui_section "[$1/5] $2"
-  ui_label '检查：' "$3"
-  ui_label '可能改变：' "$4"
-  ui_label '不会：' "$5"
-}
-
 ui_details() {
-  ui_heading '项目接入 · 完整说明'
-  ui_note '这是说明页，不会写入项目、启动安装器或改变任何配置。'
-  ui_detail_stage 1 'Agent 客户端' \
-    '已有项目偏好与入口；检测不等于安装，也不会自动代选。' \
-    '本次明确选择安装目标；到基础配置确认时才保存项目偏好。' \
-    '不自动安装或登录客户端；Universal 不是安装所有客户端。'
-  ui_detail_stage 2 '工作方式' \
-    'github-workflow、Superpowers、BMAD 的实际入口与已采用配置。' \
-    '明确选择采用一种方法，稍后安装缺失内容。' \
-    '不因发现文件或普通 Skills 安装而自动激活，不并行运行多个框架。'
-  ui_detail_stage 3 'Skills 与可选能力' \
-    '所选客户端需要的入口；已有 Skills 不会关闭添加入口。' \
-    '进入原生安装器，复用客户端选择；可选 Understand Anything。' \
-    '不使用 --yes/--all 省略授权，不截取原生 TUI，不自动分析代码。'
-  ui_detail_stage 4 '项目规范与本地 Git' \
-    'Agent 规则、忽略边界、Git root 与现有用户改动。' \
-    '确认后写入必要配置，审阅精确 ignore 差异，按需初始化本地 Git。' \
-    '不覆盖原文，不暂存提交、不推送；旧 Skills 忽略迁移另行确认。'
-  ui_detail_stage 5 '开始工作' \
-    '实际本地文件与 Git；客户端加载和首次提交另行验证。' \
-    '汇总就绪/待处理项，给出首个任务入口，再询问可选 GitHub 协作。' \
-    '不因缺少 CI 阻塞本地起步，不把文件存在当作客户端已加载。'
-  ui_section '返回'
-  ui_text '按 Enter 或输入 b 返回开始菜单；输入 q 结束本次运行。'
+  ui_heading '开始前，先了解这趟流程'
+  ui_text '目标很简单：让当前项目具备一套可以开始工作的 Agent 开发环境。' \
+    '你会依次选客户端、工作方式和 Skills，再建立项目规则与本地 Git。' \
+    '每次准备写文件或连接外部服务前，向导都会说明影响并再次询问。'
+  ui_note '现在只是查看说明；不会写项目、启动安装器或连接 GitHub。'
+
+  ui_section '第 1 步 · 选择你实际使用的 Agent'
+  ui_text '可以选择 Claude Code、Codex、OpenCode，也可以多选。已有配置只用于预选，最终仍由你确认。' \
+    '这个选择决定 Skills 应放到哪些项目目录；它不会替你安装客户端、登录账号或修改全局配置。'
+  ui_note 'Universal 只是共享 .agents/skills 目录模式，不等于安装了所有客户端。'
+
+  ui_section '第 2 步 · 选择 Agent 怎样开展任务'
+  ui_text '工作方式回答的是：Agent 接到需求后，应该按哪套方法分析、实现和验证。' \
+    'github-workflow 偏 Git/PR 协作，Superpowers 偏功能开发，BMAD 偏需求与架构；也可以保留现有方法。' \
+    '向导只保存你明确采用的一种方式。选择或安装完成都不会自动开始任务。'
+
+  ui_section '第 3 步 · 补充项目需要的 Skills'
+  ui_text '工作流自带的 Skills 和本仓库提供的额外 Skills 会分开处理，已有 Skills 也可以继续补充。' \
+    '真正的搜索、多选、作用域和复制/链接方式由原生 Skills 界面完成，bootstrap 不会代替它做决定。' \
+    '原生列表的空圆圈只表示“这次没有选”，不代表尚未安装；向导会在进入前列出已检测到的本仓库 Skills。'
+  ui_note 'Understand Anything 更适合已有代码库，可以跳过；安装它不会立即分析代码。'
+
+  ui_section '第 4 步 · 建立项目规则和本地 Git'
+  ui_text '向导会准备 AGENTS.md、客户端入口和 Git 资产规则；已有文件会保留，不会直接覆盖。' \
+    '如果需要调整 .gitignore，会先展示精确 diff。你还可以选择初始化本地 Git。' \
+    '这一步不会暂存、提交或推送代码，也不会设置全局 Git 身份。'
+
+  ui_section '第 5 步 · 确认可以从哪里开始'
+  ui_text '最后会分别告诉你：哪些文件已经就绪、哪些仍需客户端新会话确认，以及项目是否尚未提交。' \
+    '向导会给出第一个任务的起步建议。本地配置完成后，你可以直接结束，也可以继续建立 GitHub CI。' \
+    '没有 CI 不会阻止本地起步；空项目可先放入待补全 CI 骨架，真实检查成功后才会进入审查与保护。'
+
+  ui_section '你始终拥有控制权'
+  ui_text '任何时候输入 q 都可以退出。已经完成的安全步骤会保留，未确认的操作不会执行。' \
+    '以后重新运行同一命令，向导会检查项目的真实状态，而不是从某个问题编号继续。'
+  ui_note '按 Enter 或输入 b 返回开始菜单。'
 }
 
 ui_return_from_details() {

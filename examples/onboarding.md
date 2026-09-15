@@ -69,11 +69,11 @@ Understand Anything 是可选能力：已有代码库（brownfield）更适合�
 
 本地总结之后才询问是否继续 GitHub。选择不继续即正常结束，不再逐项询问 CI、Review 和 Rulesets。即使项目有 GitHub origin，选择继续之前也不访问远端。
 
-继续时可以创建或连接明确的仓库，依旧不暂存、不提交、不推送。仓库名称是必填的 `OWNER/REPOSITORY`，空输入重试，`b` 返回，`q` 退出。之后的实际发布、CI、自动审查与保护仍需相应授权和真实证据。
+继续时可以创建或连接明确的仓库，依旧不暂存、不提交、不推送。仓库名称是必填的 `OWNER/REPOSITORY`，空输入重试，`b` 返回，`q` 退出；不接入 GitHub 也可只准备本地 CI 骨架。
+
+没有 workflow 时，用户可明确确认写入 `.github/workflows/ci.yml`。它只有手动触发、只读权限和一个明确失败的 `CI setup pending — not a merge gate` job，不包含 checkout、依赖安装或猜测的测试命令。它只是提醒项目 Agent 在真实实现出现后补齐验证，绝不是 CI 成功或 required check。已有 workflow 不会被覆盖；项目资产提交、推送并出现当前版本的真实 GitHub Actions 成功 evidence 后，向导才会提供审查验证和合并保护。
 
 本仓库的 `--profile self` 只适用于 `blue126/agent-project-bootstrap/main`，不是下游默认保护。下游采用自身 CI 的真实 evidence，治理敏感操作仍由人工处理。
-
-只有在这个可选续程中明确选择验证协助，才生成 `.agent/runtime/onboarding/validation-handoff.md`。先前本地总结会保留；任务文件不是 resume cursor，也不提供运行、下载或发布授权。
 
 ## 重跑与更新
 

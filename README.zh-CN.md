@@ -180,13 +180,13 @@ python3 "$HOME/agent-project-bootstrap/scripts/configure-git-ignore.py" --projec
 
 ## 可选 GitHub 协作
 
-基础总结之后可以继续创建/连接 GitHub，再按需要准备本地验证、CI、自动审查和合并保护。没有远端分支或真实证据时保留 pending/blocked，不用“成功”占位符替代测试。
+基础总结之后可以继续创建/连接 GitHub，并建立 CI 协作保障。向导先检查项目已有的 workflow，不猜测测试命令或技术栈。
 
-Claude Auto Review 需要用户在项目的 Claude Code 会话运行官方 `/install-github-app`。选择引导不授权 Agent 安装 App、设置认证/secret、启用自动合并或批准代码。治理敏感改动由人工处理。
+项目尚无 workflow 时，经单独确认只会写入 `.github/workflows/ci.yml`：带固定标记的 CI 骨架，只有 `workflow_dispatch`、只读权限，以及一个明确失败的 `CI setup pending — not a merge gate` job。它不会 checkout 代码、安装依赖、猜测命令、制造绿色检查、提交或推送。项目有真实实现后，按项目自身资料补入真实触发器和验证，再审阅、提交、推送该改动；之后重跑 bootstrap，核实实际 GitHub Actions evidence。
 
-已有审查结果时，输入明确的 PR 编号验证当前版本的 bot 反馈，验证通过后可继续保护步骤，不会反复要求安装。这个结果只证明自动审查反馈可用，不代表合并批准，也不证明反馈来自特定 Claude App；没有 PR 时可选择查看安装指引或暂不验证。
+workflow 文件只是配置，不是通过证明。只有项目当前提交的 GitHub Actions 真实成功后，才会继续配置 required checks 和合并保护；bootstrap 绝不会把占位内容变成 merge gate。
 
-如果用户明确请求项目 Agent 协助准备验证，才在 `.agent/runtime/onboarding/` 生成结构化 handoff。它是任务文件，不是 resume 状态或执行授权；完成外部工作后重新运行主入口，根据实际证据继续。
+Claude Auto Review 需要用户在项目的 Claude Code 会话运行官方 `/install-github-app`。选择引导不授权 Agent 安装 App、设置认证/secret、启用自动合并或批准代码。项目已有真实 workflow、提交和 GitHub 仓库后，输入明确的 PR 编号可验证当前版本的 bot 反馈。这个结果只证明自动审查反馈可用，不代表合并批准，也不证明反馈来自特定 Claude App；治理敏感改动仍由人工处理。
 
 ### 创建 GitHub repository
 

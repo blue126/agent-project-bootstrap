@@ -1,0 +1,24 @@
+# @agent-project-bootstrap-ci-skeleton v1
+#
+# This workflow is intentionally pending: it has no project-specific validation
+# command and cannot serve as a merge gate. Once the project has real code,
+# replace this skeleton with triggers and checks that are supported by the
+# project's own files and documentation. Review, commit, and push that change;
+# then wait for GitHub Actions to pass before configuring required checks.
+name: CI setup pending
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ci-setup-pending:
+    name: CI setup pending — not a merge gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain next step
+        run: |
+          echo "CI setup is pending: replace this skeleton with the project's real validation."
+          exit 1

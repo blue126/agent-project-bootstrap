@@ -82,10 +82,11 @@ def inspect(root):
                     target = os.readlink(path)
                     links.append({'path': rel, 'target': target})
                 elif path.is_file() and rel != '.claude/settings.local.json' and not any(
-                        part in ('worktrees', 'runtime', 'cache', '__pycache__') for part in Path(rel).parts):
+                        part in ('worktrees', 'runtime', 'cache', '__pycache__', '.cc-writes') for part in Path(rel).parts):
                     assets.add(rel)
             # Never traverse runtime state, worktrees, caches or linked directories.
-            dirs[:] = sorted(d for d in dirs if d not in ('worktrees', 'runtime', 'cache', '__pycache__')
+            dirs[:] = sorted(d for d in dirs
+                             if d not in ('worktrees', 'runtime', 'cache', '__pycache__', '.cc-writes')
                              and not (parent / d).is_symlink())
     # Git rejects a path below a symlink instead of checking its ignore status.
     # Check the link entry itself; canonical project sources are inspected above.
@@ -129,6 +130,7 @@ def inspect(root):
         for value in result.stdout.split(b'\0'):
             path = os.fsdecode(value)
             if path and (path == '.claude/settings.local.json' or '/worktrees/' in path
+                         or path.startswith('.claude/.cc-writes/')
                          or path.startswith('.agent/runtime/') and not path.endswith('/.gitignore')
                          or path == '.env' or path.startswith('.env.') and path != '.env.example'):
                 tracked.append(path)
@@ -164,19 +166,28 @@ def proposal(root, migrate):
     baseline = (SOURCE / 'templates/project.gitignore').read_text()
     patterns = [line for line in baseline.splitlines() if line and not line.startswith('#')]
     if (root / '.claude').is_dir() or 'claude-code' in preferences['selected']:
-        patterns += ['/.claude/settings.local.json', '/.claude/worktrees/']
+        patterns += ['/.claude/settings.local.json', '/.claude/.cc-writes/', '/.claude/worktrees/']
     if (root / '.agents').is_dir() or set(preferences['selected']) & {'codex', 'opencode', 'universal'}:
         patterns += ['/.agents/worktrees/']
+    portable_skill_links = []
     for link in facts['links']:
         path = root / link['path']
         # Only links backed by our pinned Understand Anything runtime can be
-        # automatically proposed for exclusion. Other links need human review.
+        # automatically proposed for exclusion. Verified cross-client links to
+        # the canonical shared Skill stay visible as project assets.
         runtime = root / '.agent/runtime/understand-anything/repo'
         target = path.resolve()
-        if not os.path.isabs(link['target']) and runtime in target.parents:
+        relative_target = not os.path.isabs(link['target'])
+        if relative_target and runtime in target.parents:
             patterns.append(literal_pattern(link['path']))
+        elif (relative_target and Path(link['path']).parent == Path('.claude/skills')
+              and target.is_relative_to(root)
+              and target == (root / '.agents/skills' / path.name).resolve()
+              and target.exists()):
+            portable_skill_links.append(link['path'])
         else:
             facts['warnings'].append(f"Review link portability and tracked target: {link['path']}")
+    facts['portable_skill_links'] = portable_skill_links
     text = current.decode() if current is not None else baseline
     missing = [p for p in patterns if p not in text.splitlines()]
     if missing:

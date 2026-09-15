@@ -133,8 +133,19 @@ onboarding:
     - local_readiness_and_first_task
   optional_collaboration:
     - git_create_or_connect
-    - local_validation_and_ci_review_protection
-    - evidence_summary
+    - ci_scaffold_or_verify
+    - optional_review
+    - verified_ci_protection
+  ci_skeleton:
+    template: templates/github/ci.yml
+    destination: .github/workflows/ci.yml
+    marker: '@agent-project-bootstrap-ci-skeleton v1'
+    pending_check_name: CI setup pending — not a merge gate
+    trigger: workflow_dispatch_only
+    overwrites_existing_workflows: false
+    publishes_or_runs_project_code: false
+    required_check_evidence: current_successful_github_actions_only
+    protection: after_verified_ci_only
   client_selection: confirm_every_run
   client_preference_field: project_agents
   native_scope_and_method_prompts: preserved
