@@ -37,6 +37,7 @@ class LocalWizardTests(unittest.TestCase):
                         HOME=str(self.base), XDG_CONFIG_HOME=str(self.base / 'config'), TERM='dumb',
                         MOCK_CALLS=str(self.base / 'calls.jsonl'), MOCK_TARGET=str(self.target))
         self.mock('gh', 'printf "unexpected remote call\\n" >> "$MOCK_TARGET/remote-calls"; exit 92\n')
+        self.real_git = shutil.which('git', path=os.environ['PATH'])
         (self.bin / 'npx').write_text('''#!/usr/bin/env python3
 import json, os, sys
 from pathlib import Path
@@ -48,6 +49,7 @@ if os.environ.get('MOCK_CANCEL'): raise SystemExit(0)
 if os.environ.get('MOCK_FAIL'): raise SystemExit(7)
 clients = args[args.index('--agent') + 1:] if '--agent' in args else []
 skill = args[args.index('--skill') + 1] if '--skill' in args else 'example'
+if any('obra/superpowers/tree/v6.3.0' in arg for arg in args): skill = 'using-superpowers'
 for client in clients:
     directory = Path('.claude/skills' if client == 'claude-code' else '.agents/skills') / skill
     directory.mkdir(parents=True, exist_ok=True)
@@ -59,6 +61,14 @@ for client in clients:
         path = self.bin / name
         path.write_text('#!/usr/bin/env bash\nset -eu\n' + body)
         path.chmod(0o755)
+
+    def mock_superpowers_pin(self):
+        self.mock('git', f'''\nif [[ "$1" == ls-remote ]]; then
+  printf '%s\\t%s\\n' b36e0829c6d0140e93cfef2ca599b1b07d4a7797 'refs/tags/v6.3.0^{{}}'
+  exit 0
+fi
+exec {shlex.quote(self.real_git)} "$@"
+''')
 
     def tty(self, answers, expected=0, extra=(), cwd=None, argv=None):
         master, slave = pty.openpty()
@@ -228,22 +238,34 @@ for client in clients:
         self.assertTrue((self.target / '.agent/bootstrap.yml').is_file())
         self.assertFalse((self.base / '.agent').exists())
 
-    def test_local_completion_has_git_no_remote_no_commit_or_handoff(self):
+    def test_local_completion_has_git_no_remote_no_commit_or_ci_skeleton(self):
         text = self.tty(self.answers())
         self.assertIn('本地配置就绪，待客户端加载确认', text)
         self.assertIn('版本状态：尚未提交', text)
         self.assertIn('首次提交检查：未执行', text)
         self.assertTrue((self.target / '.git').is_dir())
         self.assertFalse((self.target / 'remote-calls').exists())
-        self.assertFalse((self.target / '.agent/runtime/onboarding/validation-handoff.md').exists())
+        self.assertFalse((self.target / '.github/workflows/ci.yml').exists())
         self.assertNotEqual(subprocess.run(['git', '-C', str(self.target), 'rev-parse', '--verify', 'HEAD'], capture_output=True).returncode, 0)
         self.assertEqual(subprocess.check_output(['git', '-C', str(self.target), 'ls-files']), b'')
         self.assertIn('project_agents: ["claude-code"]', (self.target / '.agent/bootstrap.yml').read_text())
+        self.assertIn('未发现被现有规则忽略的已知项目资产候选', text)
+        self.assertIn('未发现已被 Git 跟踪的已知本地状态', text)
+        self.assertNotIn('当前被忽略的资产候选（含示例探针', text)
+        self.assertNotIn('已跟踪的本地状态候选（不会自动取消跟踪）', text)
 
     def test_intro_cancel_does_not_create_target(self):
         self.tty([('开始接入', 'n')])
         self.assertFalse(self.target.exists())
-        self.tty([('开始接入', 'i'), ('Enter 返回开始菜单', ''), ('开始接入', 'q')], expected=3)
+        text = self.tty([('开始接入', 'i'), ('Enter 返回开始菜单', ''),
+                         ('开始接入', 'q')], expected=3)
+        self.assertIn('开始前，先了解这趟流程', text)
+        self.assertIn('目标很简单：让当前项目具备一套可以开始工作的 Agent 开发环境', text)
+        self.assertIn('你始终拥有控制权', text)
+        self.assertIn('原生列表的空圆圈只表示“这次没有选”', text)
+        self.assertNotIn('检查：', text)
+        self.assertNotIn('可能改变：', text)
+        self.assertNotIn('不会：', text)
         self.assertFalse(self.target.exists())
 
     def test_client_cancel_does_not_create_target(self):
@@ -290,10 +312,33 @@ for client in clients:
         self.assertIn('采用的工作方式：github-workflow', text)
         self.assertFalse((self.target / 'remote-calls').exists())
 
+    def test_superpowers_success_is_recorded_without_internal_skip_warning(self):
+        self.mock_superpowers_pin()
+        text = self.tty(self.answers(clients='claude-code universal', workflow='superpowers'))
+        config = (self.target / '.agent/bootstrap.yml').read_text()
+        self.assertIn('工作方式：superpowers', text)
+        self.assertIn('Superpowers 工作流 Skills 已安装', text)
+        self.assertNotIn('project installation was skipped by explicit choice', text)
+        self.assertNotIn('does not verify its source or pinned version', text)
+        self.assertIn('installation: install', config)
+        self.assertIn('tag: v6.3.0', config)
+        self.assertIn('ref: b36e0829c6d0140e93cfef2ca599b1b07d4a7797', config)
+        self.assertIn('Superpowers installation is recorded at verified v6.3.0', text)
+
     def test_existing_skills_still_offer_and_saved_client_still_confirms(self):
         self.tty(self.answers(skills='y'))
         self.tty(self.answers(skills='y', policy='n'))
         self.assertEqual(len(self.calls()), 2)
+
+    def test_native_skill_chooser_explains_and_lists_installed_curated_skills(self):
+        entry = self.target / '.agents/skills/oink-docs'
+        entry.mkdir(parents=True)
+        (entry / 'SKILL.md').write_text('Existing OINK Skill\n')
+        text = self.tty(self.answers(clients='universal', policy='n'))
+        self.assertIn('已检测到本仓库 Skills：oink-docs', text)
+        self.assertIn('空圆圈表示“本次未选择”，不表示该 Skill 尚未安装', text)
+        self.assertLess(text.index('已检测到本仓库 Skills'), text.index('进入技能选择'))
+        self.assertEqual(self.calls(), [])
 
     def test_universal_does_not_create_claude_entry(self):
         self.tty(self.answers(clients='universal', skills='y'))
@@ -420,14 +465,19 @@ for client in clients:
         answers = self.answers(collaboration='y') + [('GitHub 操作', ''), ('GitHub 操作', 'q')]
         text = self.tty(answers, expected=3)
         self.assertIn('空输入不会跳过 GitHub', text)
-        self.assertLess(text.index('本地结果与开始工作'), text.index('可选协作 · Git/GitHub'))
+        self.assertLess(text.index('本地结果与开始工作'), text.index('可选协作 · 建立 GitHub CI 与协作保障'))
         self.assertFalse((self.target / 'remote-calls').exists())
 
     def test_existing_review_feedback_is_verified_and_continues_to_protection(self):
         self.target.mkdir()
         subprocess.run(['git', 'init', '-q', str(self.target)], check=True)
         subprocess.run(['git', '-C', str(self.target), 'remote', 'add', 'origin', 'https://github.com/acme/project.git'], check=True)
+        subprocess.run(['git', '-C', str(self.target), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                        'commit', '--allow-empty', '-qm', 'fixture'], check=True)
         self.mock('gh', 'printf "acme/project\\n"\n')
+        workflow = self.target / '.github/workflows/project-ci.yml'
+        workflow.parent.mkdir(parents=True)
+        workflow.write_text('name: Project CI\\non: workflow_dispatch\\n')
         fixture_repo = self.base / 'fixture-toolkit'
         (fixture_repo / 'scripts').mkdir(parents=True)
         checker = fixture_repo / 'scripts/check-bootstrap-evidence.sh'
@@ -446,6 +496,7 @@ printf '{}\\n'
 set -eu
 repo_root="$FIXTURE_REPO"
 target_dir="$MOCK_TARGET"
+source "$REAL_REPO/scripts/lib/onboarding-ci.sh"
 source "$REAL_REPO/scripts/lib/onboarding-collaboration.sh"
 ui_heading() { printf '%s\n' "$*"; }
 ui_section() { printf '%s\n' "$*"; }
@@ -455,7 +506,6 @@ ui_warning() { printf '%s\n' "$*"; }
 confirm() { [[ "$1" == 验证\ PR* ]]; }
 ask() { reply=12; }
 pause_for_agent() { exit 93; }
-handoff_require_safe_path() { return 0; }
 run_collaboration
 '''
         calls = self.base / 'evidence-calls'
@@ -471,12 +521,58 @@ run_collaboration
                 self.assertIn('审查反馈尚未验证', result.stdout)
         self.assertIn('--kind review --repo acme/project --pr 12 --discover', calls.read_text())
 
-    def test_validation_handoff_only_after_collaboration_opt_in(self):
-        text = self.tty(self.answers(collaboration='y') + [('GitHub 操作', '3'), ('让目标项目 Agent 协助准备', 'y')], expected=3)
-        self.assertIn('需要项目 Agent 协助', text)
-        handoff = self.target / '.agent/runtime/onboarding/validation-handoff.md'
-        self.assertTrue(handoff.is_file())
-        self.assertNotIn('--key-dir', handoff.read_text())
+    def test_ci_skeleton_can_be_prepared_without_github_or_local_validation(self):
+        text = self.tty(self.answers(git='n', collaboration='y')
+                        + [('GitHub 操作', '3'), ('创建待补全的 CI 骨架', 'y')])
+        skeleton = self.target / '.github/workflows/ci.yml'
+        self.assertTrue(skeleton.is_file())
+        content = skeleton.read_text()
+        self.assertIn('@agent-project-bootstrap-ci-skeleton v1', content)
+        self.assertIn('workflow_dispatch:', content)
+        self.assertIn('contents: read', content)
+        self.assertIn('CI setup pending — not a merge gate', content)
+        self.assertIn('exit 1', content)
+        self.assertNotIn('pull_request:', content)
+        self.assertNotIn('push:', content)
+        self.assertNotIn('actions/checkout', content)
+        self.assertNotIn('npm ', content)
+        self.assertNotIn('pytest', content)
+        self.assertIn('这个骨架没有测试任何代码', text)
+        self.assertFalse((self.target / '.agent/runtime/onboarding').exists())
+        self.assertFalse((self.target / 'remote-calls').exists())
+        self.assertFalse((self.target / '.git').exists())
+
+    def test_ci_skeleton_is_pending_and_never_overwrites_project_workflows(self):
+        first = self.tty(self.answers(collaboration='y')
+                         + [('GitHub 操作', '3'), ('创建待补全的 CI 骨架', 'y')])
+        skeleton = self.target / '.github/workflows/ci.yml'
+        before = skeleton.read_bytes()
+        second = self.tty(self.answers(policy='n', collaboration='y') + [('GitHub 操作', '3')])
+        self.assertEqual(skeleton.read_bytes(), before)
+        self.assertIn('待补全 CI 骨架仍在', second)
+        self.assertNotIn('创建待补全的 CI 骨架', second)
+        skeleton.write_text('name: User CI\non: workflow_dispatch\n')
+        third = self.tty(self.answers(policy='n', collaboration='y') + [('GitHub 操作', '3')])
+        self.assertEqual(skeleton.read_text(), 'name: User CI\non: workflow_dispatch\n')
+        self.assertIn('尚未连接可验证的 GitHub 仓库', third)
+
+    def test_ci_skeleton_preserves_existing_workflow_and_unsafe_parent(self):
+        workflow = self.target / '.github/workflows/user.yml'
+        workflow.parent.mkdir(parents=True)
+        workflow.write_text('name: User workflow\n')
+        text = self.tty(self.answers(collaboration='y') + [('GitHub 操作', '3')])
+        self.assertEqual(workflow.read_text(), 'name: User workflow\n')
+        self.assertFalse((workflow.parent / 'ci.yml').exists())
+        self.assertIn('尚未连接可验证的 GitHub 仓库', text)
+        self.target = self.base / 'unsafe-project'
+        self.env['MOCK_TARGET'] = str(self.target)
+        self.target.mkdir()
+        outside = self.base / 'outside-workflows'
+        outside.mkdir()
+        (self.target / '.github').symlink_to(outside)
+        unsafe = self.tty(self.answers(collaboration='y') + [('GitHub 操作', '3')])
+        self.assertIn('使用符号链接', unsafe)
+        self.assertFalse((outside / 'workflows/ci.yml').exists())
 
 
 unittest.main(defaultTest=os.environ.get('BOOTSTRAP_JOURNEY_TEST') or None, verbosity=2, failfast=True)

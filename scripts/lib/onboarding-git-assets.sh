@@ -4,7 +4,7 @@
 git_assets_status='本次未检查或应用'
 git_assets_failed=false
 review_git_assets() {
-  local preview token line
+  local preview token line portable_count
   local args=(--project "${target_dir}" --json)
   ui_section '版本控制规范与忽略规则'
   ui_text '共享 Agent 能力、锁文件和正式成果是项目资产；个人配置、凭据和运行状态留在本机。' \
@@ -15,10 +15,22 @@ review_git_assets() {
   }
   while :; do
     while IFS= read -r line; do ui_text "${line}"; done < <(printf '%s' "${preview}" | jq -r '.facts.warnings[]')
-    ui_note '当前被忽略的资产候选（含示例探针，最多显示 20 项；不自动放行）：'
-    printf '%s' "${preview}" | jq -r '.facts.ignored_candidates[:20][] | "  \(.path) ← \(.source):\(.line) \(.rule)"'
-    ui_note '已跟踪的本地状态候选（不会自动取消跟踪）：'
-    printf '%s' "${preview}" | jq -r '.facts.tracked_local_candidates[:20][] | "  \(.)"'
+    portable_count="$(printf '%s' "${preview}" | jq '.facts.portable_skill_links | length')"
+    if [[ "${portable_count}" -gt 0 ]]; then
+      ui_text "✓ 已核实 ${portable_count} 个 Claude Code 入口使用项目内共享 Skills 相对链接。"
+    fi
+    if [[ "$(printf '%s' "${preview}" | jq '.facts.ignored_candidates | length')" -gt 0 ]]; then
+      ui_note '当前被忽略的资产候选（含示例探针，最多显示 20 项；不自动放行）：'
+      printf '%s' "${preview}" | jq -r '.facts.ignored_candidates[:20][] | "  \(.path) ← \(.source):\(.line) \(.rule)"'
+    else
+      ui_text '✓ 未发现被现有规则忽略的已知项目资产候选。'
+    fi
+    if [[ "$(printf '%s' "${preview}" | jq '.facts.tracked_local_candidates | length')" -gt 0 ]]; then
+      ui_note '已跟踪的本地状态候选（不会自动取消跟踪）：'
+      printf '%s' "${preview}" | jq -r '.facts.tracked_local_candidates[:20][] | "  \(.)"'
+    else
+      ui_text '✓ 未发现已被 Git 跟踪的已知本地状态。'
+    fi
     if [[ "$(printf '%s' "${preview}" | jq '.changes | length')" -gt 0 ]]; then
       ui_section '拟写入的精确差异'
       printf '%s' "${preview}" | jq -r '.changes[].diff'

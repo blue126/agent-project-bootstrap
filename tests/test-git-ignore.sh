@@ -59,8 +59,9 @@ class IgnoreTests(unittest.TestCase):
                   '.agents/skills/my/SKILL.md', 'skills-lock.json', 'package-lock.json', 'uv.lock',
                   '_bmad/_config/config.yaml', '_bmad-output/planning-artifacts/prd.md',
                   'docs/output/research.md', 'tests/fixtures/sample.db', '.env.example']
-        local = ['.claude/settings.local.json', '.claude/worktrees/branch/private.txt',
-                 '.agent/runtime/session.json', '.env', '.env.production', '.DS_Store']
+        local = ['.claude/settings.local.json', '.claude/.cc-writes/receipt.json',
+                 '.claude/worktrees/branch/private.txt', '.agent/runtime/session.json',
+                 '.env', '.env.production', '.DS_Store']
         for name in assets + local:
             self.write(name)
         before = self.invoke()
@@ -83,7 +84,8 @@ class IgnoreTests(unittest.TestCase):
         self.assertEqual(preview['facts']['project_agents'], ['claude-code'])
         self.invoke('--apply', '--expect', preview['token'])
         self.git('init', '-q')
-        for name in ('.claude/settings.local.json', '.claude/worktrees/topic/file.txt'):
+        for name in ('.claude/settings.local.json', '.claude/.cc-writes/receipt.json',
+                     '.claude/worktrees/topic/file.txt'):
             self.assertEqual(self.git('check-ignore', '--no-index', name).returncode, 0, name)
         self.assertEqual(self.git('check-ignore', '--no-index', '.claude/settings.json').returncode, 1)
         self.assertFalse((self.project / '.claude').exists())
@@ -170,6 +172,16 @@ class IgnoreTests(unittest.TestCase):
         (self.project / '.agents').symlink_to(self.base)
         self.invoke(expected=1)
         self.assertFalse((self.project / '.gitignore').exists())
+
+    def test_expected_cross_client_links_are_summarized_not_warned(self):
+        self.write('.agents/skills/example/SKILL.md')
+        link = self.project / '.claude/skills/example'
+        link.parent.mkdir(parents=True)
+        link.symlink_to('../../.agents/skills/example')
+        preview = self.invoke()
+        self.assertEqual(preview['facts']['portable_skill_links'], ['.claude/skills/example'])
+        self.assertFalse(any('example' in warning for warning in preview['facts']['warnings']))
+        self.assertFalse(any(change['path'] == '.claude/skills/example' for change in preview['changes']))
 
     def test_runtime_link_only_exact_path_is_ignored(self):
         target = '.agent/runtime/understand-anything/repo/understand-anything-plugin/skills/understand'

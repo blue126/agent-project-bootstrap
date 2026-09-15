@@ -180,13 +180,13 @@ Legacy Skills migration requires `--migrate-skills` in both the preview and appl
 
 ## Optional GitHub collaboration
 
-After the local summary, you can create or connect a GitHub repository, then prepare local validation, CI, automated review, and merge protection as needed. Missing remote branches or real evidence remain pending/blocked; a placeholder “success” cannot substitute for tests.
+After the local summary, you can create or connect a GitHub repository and establish CI collaboration safeguards. The wizard first inspects project workflows instead of guessing a test command or technology stack.
 
-Claude Auto Review requires the user to run the official `/install-github-app` in the project's Claude Code session. Selecting guidance does not authorize an agent to install the App, configure authentication or secrets, enable auto-merge, or approve code. Governance-sensitive changes require human handling.
+For a project without a workflow, an explicitly confirmed setup writes only `.github/workflows/ci.yml`: a marked CI skeleton with `workflow_dispatch`, read-only permissions, and a visibly failing `CI setup pending — not a merge gate` job. It neither checks out code nor installs dependencies, runs a guessed command, creates a green check, commits, or pushes. Once the project has real implementation, replace it with the project's real triggers and validation, review and publish that change, then rerun bootstrap to verify the resulting GitHub Actions evidence.
 
-If review results already exist, enter an explicit PR number to verify bot feedback on its current revision. Successful verification continues to protection setup instead of repeatedly handing off installation. This verifies feedback availability only—not merge approval or the identity of a particular Claude App. Without a PR, you can view installation guidance or skip verification for now.
+A workflow file is configuration, not proof. Required checks and merge protection remain pending until a current GitHub Actions run succeeds for the project’s actual commit; bootstrap never turns a placeholder into a merge gate.
 
-A structured handoff is created under `.agent/runtime/onboarding/` only when the user explicitly asks a project agent to help prepare validation. It is a task file, not resume state or execution authorization. After external work, rerun the main entry point to continue based on actual evidence.
+Claude Auto Review requires the user to run the official `/install-github-app` in the project's Claude Code session. Selecting guidance does not authorize an agent to install the App, configure authentication or secrets, enable auto-merge, or approve code. When an actual project workflow, commit, and GitHub repository exist, enter an explicit PR number to verify bot feedback on its current revision. This verifies feedback availability only—not merge approval or the identity of a particular Claude App. Governance-sensitive changes require human handling.
 
 ### Create a GitHub repository
 

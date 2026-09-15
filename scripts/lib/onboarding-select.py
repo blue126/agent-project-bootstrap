@@ -127,7 +127,7 @@ def read_key(fd):
             return key
         # Distinguish a standalone Escape from CSI/application cursor keys.
         sequence = b''
-        while select.select([fd], [], [], 0.1)[0]:
+        while select.select([fd], [], [], 0.25)[0]:
             char = os.read(fd, 1)
             if not char:
                 raise Cancelled
@@ -135,8 +135,12 @@ def read_key(fd):
             if len(sequence) == 1 and char not in (b'[', b'O'):
                 return b'\x1b'
             if len(sequence) > 1 and 0x40 <= char[0] <= 0x7e:
-                return {b'[A': b'up', b'OA': b'up',
-                        b'[B': b'down', b'OB': b'down'}.get(sequence, b'other')
+                if sequence in (b'OA', b'OB'):
+                    return b'up' if sequence == b'OA' else b'down'
+                if (sequence.startswith(b'[') and sequence[-1:] in (b'A', b'B')
+                        and all(byte in b'0123456789;' for byte in sequence[1:-1])):
+                    return b'up' if sequence[-1:] == b'A' else b'down'
+                return b'other'
             if len(sequence) > 16:
                 return b'other'
         return b'\x1b'
@@ -163,7 +167,8 @@ class InlineDisplay:
         for index in range(start, start + visible):
             item, label = args.option[index]
             pointer = '>' if index == focus else ' '
-            mark = '[x]' if item in selected else '[ ]'
+            is_selected = item in selected if args.multi else index == focus
+            mark = '[x]' if is_selected else '[ ]'
             lines.append(f'{pointer} {mark} {label}')
         hint = 'Arrows move' + (' / Space toggles' if args.multi else '') + ' / Enter confirms / q cancels'
         if visible < len(args.option):

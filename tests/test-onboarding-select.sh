@@ -28,6 +28,11 @@ spec.loader.exec_module(selector)
 
 OPTIONS = ['--title', 'Choose clients', '--option', 'alpha', 'Alpha',
            '--option', 'beta', 'Beta', '--option', 'gamma', 'Gamma']
+WORKFLOW_OPTIONS = ['--title', 'Choose workflow',
+                    '--option', 'github-workflow', 'GitHub workflow',
+                    '--option', 'superpowers', 'Superpowers',
+                    '--option', 'bmad', 'BMAD',
+                    '--option', 'none', 'Keep existing approach']
 
 
 class SelectorTests(unittest.TestCase):
@@ -121,6 +126,26 @@ class SelectorTests(unittest.TestCase):
 
     def test_single_preselection(self):
         self.fixture([(b'q cancels', b'\r')], extra=['--selected', 'gamma'], output=b'gamma\n')
+
+    def test_single_visual_selection_follows_focus(self):
+        text = self.fixture([(b'q cancels', b'\x1b[A\r')],
+                            extra=['--selected', 'none'], options=WORKFLOW_OPTIONS,
+                            output=b'bmad\n')
+        self.assertIn('> [x] BMAD', text)
+        self.assertIn('  [ ] Keep existing approach', text)
+
+    def test_parameterized_csi_cursor_keys(self):
+        self.fixture([(b'q cancels', b'\x1b[1;5A\r')],
+                     extra=['--selected', 'none'], options=WORKFLOW_OPTIONS,
+                     output=b'bmad\n')
+        self.fixture([(b'q cancels', b'\x1b[1;2B\r')],
+                     extra=['--selected', 'none'], options=WORKFLOW_OPTIONS,
+                     output=b'github-workflow\n')
+
+    def test_unsupported_csi_is_not_navigation(self):
+        self.fixture([(b'q cancels', b'\x1b[1;5C\r')],
+                     extra=['--selected', 'none'], options=WORKFLOW_OPTIONS,
+                     output=b'none\n')
 
     def test_multi_arrows_and_space(self):
         self.fixture([(b'q cancels', b' \x1b[B \r')], extra=['--multi'],

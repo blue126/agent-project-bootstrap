@@ -28,8 +28,10 @@ manifest = manifest.replace("\nonboarding:\n", "    - name: fixture-client\n    
 (source / "bootstrap-manifest.yml").write_text(manifest)
 (source / "skills/pre-mortem").mkdir(parents=True)
 (source / "skills/pre-mortem/SKILL.md").write_text("Fixture curated skill\n")
-(source / "integrations/understand-anything").mkdir(parents=True)
-shutil.copyfile(repo / "integrations/understand-anything/integration.yml", source / "integrations/understand-anything/integration.yml")
+for integration in ("understand-anything", "superpowers"):
+    (source / "integrations" / integration).mkdir(parents=True)
+    shutil.copyfile(repo / "integrations" / integration / "integration.yml",
+                    source / "integrations" / integration / "integration.yml")
 helper = source / "scripts/lib/onboarding-project.py"
 spec = importlib.util.spec_from_file_location("onboarding_project", helper)
 module = importlib.util.module_from_spec(spec)
@@ -91,10 +93,19 @@ class LocalProjectTests(unittest.TestCase):
     def ready(self, workflow="none", agents=("claude-code",)):
         return self.cli("readiness", "--agents", *agents, "--workflow", workflow)
 
-    def save(self, workflow="none", agents=("claude-code",), expect=None, ok=True):
+    def save(self, workflow="none", agents=("claude-code",), expect=None, ok=True, superpowers_ref=None):
         if expect is None:
             expect = self.cli("clients")["config_sha256"] or "missing"
-        return self.cli("save", "--agents", *agents, "--workflow", workflow, "--expect", expect, ok=ok)
+        args = ["save", "--agents", *agents, "--workflow", workflow, "--expect", expect]
+        if superpowers_ref is not None:
+            args.extend(("--verified-superpowers-ref", superpowers_ref))
+        return self.cli(*args, ok=ok)
+
+    def test_links_report_installed_curated_skills(self):
+        self.write('.agents/skills/pre-mortem/SKILL.md')
+        report = self.cli('links', '--agents', 'universal')
+        self.assertEqual(report['installed_curated'], ['pre-mortem'])
+        self.assertEqual(report['links'], [])
 
     def test_missing_directory_inspection_never_creates_it(self):
         self.project = self.project / 'absent'
@@ -106,6 +117,7 @@ class LocalProjectTests(unittest.TestCase):
         source_file = self.write('.agents/skills/github-workflow/SKILL.md', 'Customized project skill\n')
         preview = self.cli('links', '--agents', 'claude-code', 'codex')
         self.assertEqual(len(preview['links']), 1)
+        self.assertEqual(preview['installed_curated'], [])
         destination = self.project / '.claude/skills/github-workflow'
         self.assertFalse(destination.exists())
         self.cli('links', '--agents', 'claude-code', 'codex', '--apply', '--expect', preview['token'])
@@ -146,7 +158,8 @@ class LocalProjectTests(unittest.TestCase):
     def test_metadata_contract_and_bounded_client_discovery(self):
         self.assertEqual(self.cli('metadata'), {
             'selected': [], 'workflow': 'none', 'config_sha256': None,
-            'curated_skills': '', 'workflow_pack': '', 'understand_anything': '', 'superpowers': ''})
+            'curated_skills': '', 'workflow_pack': '', 'understand_anything': '', 'superpowers': '',
+            'superpowers_upstream': '', 'superpowers_tag': '', 'superpowers_ref': ''})
         self.config_file('project_agents:\t["codex", "claude-code"] # selected\n'
                          'integrations:\n  understand_anything:\n    installation:\t"install"\t# recorded\n'
                          "superpowers:\n  installation: 'install # preserved scalar'\n"
@@ -167,7 +180,8 @@ class LocalProjectTests(unittest.TestCase):
         self.assertEqual(data, {'selected': ['codex', 'claude-code'], 'workflow': 'none',
                                'config_sha256': hashlib.sha256(self.config.read_bytes()).hexdigest(),
                                'curated_skills': 'skip', 'workflow_pack': 'none',
-                               'understand_anything': 'install', 'superpowers': 'install # preserved scalar'})
+                               'understand_anything': 'install', 'superpowers': 'install # preserved scalar',
+                               'superpowers_upstream': '', 'superpowers_tag': '', 'superpowers_ref': ''})
 
     def test_readiness_requires_metadata_but_allows_prewrite_workflow_check(self):
         self.baseline()
@@ -204,6 +218,23 @@ class LocalProjectTests(unittest.TestCase):
         self.assertIn(b"  workflow_pack: github-workflow\n", self.config.read_bytes())
         self.assertFalse(list(self.config.parent.glob(".bootstrap-*")))
         self.assertFalse((self.project / ".git").exists())
+
+    def test_superpowers_pin_is_recorded_only_with_matching_entry_and_contract(self):
+        self.baseline()
+        ref = 'b36e0829c6d0140e93cfef2ca599b1b07d4a7797'
+        self.save('superpowers', ('universal',), superpowers_ref=ref, ok=False)
+        self.write('.agents/skills/using-superpowers/SKILL.md')
+        self.save('superpowers', ('universal',), superpowers_ref='0' * 40, ok=False)
+        self.save('superpowers', ('universal',), superpowers_ref=ref)
+        data = self.cli('metadata')
+        self.assertEqual(data['superpowers'], 'install')
+        self.assertEqual(data['superpowers_upstream'], 'https://github.com/obra/superpowers')
+        self.assertEqual(data['superpowers_tag'], 'v6.3.0')
+        self.assertEqual(data['superpowers_ref'], ref)
+        report = self.ready('superpowers', ('universal',))
+        self.assertTrue(report['ready'], report)
+        self.assertTrue(any('recorded at verified v6.3.0' in note for note in report['notes']))
+        self.assertFalse(any('does not verify its source' in note for note in report['notes']))
 
     def test_stale_snapshot_and_duplicate_or_unsupported_config_fail_closed(self):
         self.config_file()

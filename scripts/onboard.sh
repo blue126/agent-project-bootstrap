@@ -129,10 +129,12 @@ else
   active="${selection}"
   install_workflow="${selection}"
 fi
+ui_text "工作方式：${active}"
 ui_note '选择采用只会在之后确认项目配置时保存；安装或选择不自动执行任务。'
 
 ui_heading '阶段 3/5 · Skills 与可选能力'
 installation_failed=false
+superpowers_verified_ref=""
 entry_plan="$(project_info links --agents "${project_agents[@]}")" || exit 1
 printf '%s' "${entry_plan}" | jq -r '.conflicts[] | "  待处理：\(.)"'
 if [[ "$(printf '%s' "${entry_plan}" | jq '.links | length')" -gt 0 ]]; then
@@ -157,8 +159,16 @@ if [[ "${install_workflow}" != none ]]; then
         pin="$(git ls-remote https://github.com/obra/superpowers.git 'refs/tags/v6.3.0' 'refs/tags/v6.3.0^{}')" || pin=''
         if ! printf '%s\n' "${pin}" | grep -q '^b36e0829c6d0140e93cfef2ca599b1b07d4a7797[[:space:]]'; then
           ui_warning 'Superpowers 固定版本校验失败，未执行安装。'; installation_failed=true
+        elif run_installer npx skills@1.5.23 add https://github.com/obra/superpowers/tree/v6.3.0 --agent "${project_agents[@]}"; then
+          post_install="$(project_info clients)" || post_install='{}'
+          if printf '%s' "${post_install}" | jq -e '.installed_workflows | index("superpowers") != null' >/dev/null; then
+            superpowers_verified_ref='b36e0829c6d0140e93cfef2ca599b1b07d4a7797'
+          else
+            ui_warning '安装器未留下可验证的 Superpowers 项目入口。'
+            installation_failed=true
+          fi
         else
-          run_installer npx skills@1.5.23 add https://github.com/obra/superpowers/tree/v6.3.0 --agent "${project_agents[@]}" || installation_failed=true
+          installation_failed=true
         fi ;;
       bmad)
         if [[ -e "${target_dir}/_bmad" || -L "${target_dir}/_bmad" ]]; then
@@ -206,8 +216,17 @@ if [[ "${active}" == bmad && -f "${target_dir}/_bmad/_config/manifest.yaml" && "
 fi
 
 ui_section '普通 Skills'
-ui_text '已有 Skills 保留；你仍可添加其他能力或为所选客户端安装入口。' \
-  '官方界面负责搜索、多选、安装作用域与复制/链接。推荐选 Project；Global 不算项目入口已就绪。'
+curated_inventory="$(project_info links --agents "${project_agents[@]}")" || curated_inventory='{"installed_curated":[]}'
+if [[ "$(printf '%s' "${curated_inventory}" | jq '.installed_curated | length')" -gt 0 ]]; then
+  ui_text "已检测到本仓库 Skills：$(printf '%s' "${curated_inventory}" | jq -r '.installed_curated | join(", ")')"
+fi
+ui_note '原生列表中的空圆圈表示“本次未选择”，不表示该 Skill 尚未安装；重复选择会在确认页标注 overwrites。'
+if [[ "${superpowers_verified_ref}" != "" ]]; then
+  ui_text 'Superpowers 工作流 Skills 已安装。还可以从 Agent Project Bootstrap 添加其他独立 Skills。'
+else
+  ui_text '已有 Skills 保留；你仍可添加其他能力或为所选客户端安装入口。'
+fi
+ui_text '官方界面负责搜索、多选、安装作用域与复制/链接。推荐选 Project；Global 不算项目入口已就绪。'
 if confirm '进入技能选择？'; then
   mkdir -p "${target_dir}"
   run_installer npx skills@1.5.23 add "${repo_root}" --agent "${project_agents[@]}" || installation_failed=true
@@ -223,6 +242,13 @@ if confirm '安装或补齐 Understand Anything 项目入口？'; then
   "${repo_root}/scripts/install-understand-anything.sh" "${args[@]}" || installation_failed=true
 else ui_note '本次不安装 Understand Anything，继续项目规范。'; fi
 
+save_project_selection() {
+  local snapshot_token="$1"
+  local save_args=(save --agents "${project_agents[@]}" --workflow "${active}" --expect "${snapshot_token}")
+  [[ -z "${superpowers_verified_ref}" ]] || save_args+=(--verified-superpowers-ref "${superpowers_verified_ref}")
+  project_info "${save_args[@]}" >/dev/null
+}
+
 ui_heading '阶段 4/5 · 项目规范与本地 Git'
 ui_text "项目客户端：${project_agents[*]}" "采用的工作方式：${active}" \
   '将保存项目偏好、建立必要规则与客户端入口；已有原文保留，忽略规则稍后展示精确差异。' \
@@ -231,16 +257,16 @@ if confirm '建立或更新上述项目基础配置？'; then
   mkdir -p "${target_dir}"
   if [[ -f "${target_dir}/.agent/bootstrap.yml" ]]; then
     token="$(printf '%s' "${state}" | jq -r .config_sha256)"
-    project_info save --agents "${project_agents[@]}" --workflow "${active}" --expect "${token}" >/dev/null || exit 1
-    "${repo_root}/scripts/bootstrap.sh" --target "${target_dir}" --update || exit 1
+    save_project_selection "${token}" || exit 1
+    BOOTSTRAP_COORDINATED=1 "${repo_root}/scripts/bootstrap.sh" --target "${target_dir}" --update || exit 1
   else
     args=(--target "${target_dir}" --workflow "${active}" --skip-skills --skip-understand-anything --skip-superpowers --adopt-existing)
     [[ "${active}" != github-workflow ]] || args+=(--skip-claude-auto-review)
     for client in "${project_agents[@]}"; do args+=(--agent "${client}"); done
-    "${repo_root}/scripts/bootstrap.sh" "${args[@]}" || exit 1
+    BOOTSTRAP_COORDINATED=1 "${repo_root}/scripts/bootstrap.sh" "${args[@]}" || exit 1
     latest="$(project_info clients)" || exit 1
     token="$(printf '%s' "${latest}" | jq -r .config_sha256)"
-    project_info save --agents "${project_agents[@]}" --workflow "${active}" --expect "${token}" >/dev/null || exit 1
+    save_project_selection "${token}" || exit 1
   fi
   review_git_assets
   if ! git -C "${target_dir}" rev-parse --git-dir >/dev/null 2>&1; then
@@ -290,7 +316,7 @@ if confirm '继续可选 GitHub 协作配置？'; then
   fi
   command -v gh >/dev/null || { ui_warning '可选协作需要 gh；基础配置已保留，没有安装依赖。'; exit 0; }
   # shellcheck disable=SC1091
-  source "${repo_root}/scripts/lib/onboarding-handoff.sh"
+  source "${repo_root}/scripts/lib/onboarding-ci.sh"
   # shellcheck disable=SC1091
   source "${repo_root}/scripts/lib/onboarding-collaboration.sh"
   run_collaboration

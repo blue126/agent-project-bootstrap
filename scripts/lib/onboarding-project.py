@@ -179,6 +179,9 @@ def metadata(project, clients):
         "workflow_pack": ("components", "workflow_pack"),
         "understand_anything": ("integrations", "understand_anything", "installation"),
         "superpowers": ("superpowers", "installation"),
+        "superpowers_upstream": ("superpowers", "upstream"),
+        "superpowers_tag": ("superpowers", "tag"),
+        "superpowers_ref": ("superpowers", "ref"),
     }.items():
         level = entries
         for depth, key in enumerate(keys[:-1], 1):
@@ -316,7 +319,14 @@ def ua_verified(project):
         return None
 
 
-def save(project, clients, agents, workflow, expect):
+def superpowers_contract():
+    entries = mapping((SOURCE / "integrations/superpowers/integration.yml").read_text().splitlines(keepends=True))
+    known = child(entries["known_good"], 2)
+    return {"upstream": scalar(entries["upstream"]), "tag": scalar(known["tag"]),
+            "ref": scalar(known["ref"])}
+
+
+def save(project, clients, agents, workflow, expect, verified_superpowers_ref=None):
     lines, entries, current = snapshot(project, clients)
     if not lines:
         raise ValueError("Bootstrap configuration must exist before saving selections")
@@ -345,7 +355,16 @@ def save(project, clients, agents, workflow, expect):
                 child(integrations["understand_anything"], 4)
         desired.extend(["integrations:\n", "  understand_anything:\n"])
         desired.extend(f"    {key}: {value}\n" for key, value in verified.items())
-    # A Superpowers entry proves availability, not its source/ref. Preserve it.
+    if verified_superpowers_ref is not None:
+        contract = superpowers_contract()
+        if verified_superpowers_ref != contract["ref"] or "superpowers" not in installed:
+            raise ValueError("Superpowers verification does not match the managed contract or installed entry")
+        if "superpowers" in entries:
+            child(entries["superpowers"], 2)
+        desired.append("superpowers:\n")
+        desired.append("  installation: install\n")
+        desired.extend(f"  {key}: {contract[key]}\n" for key in ("upstream", "tag", "ref"))
+    # Without explicit evidence from this run, preserve the existing Superpowers record.
     output = "".join(merger.merge(lines, desired)).encode("utf-8")
     path = path_in(project, ".agent/bootstrap.yml")
     mode = stat.S_IMODE(path.stat().st_mode)
@@ -497,7 +516,13 @@ def readiness(project, clients, agents, workflow):
             if result["id"] in blocked:
                 result["ready"] = False
     if workflow == "superpowers":
-        notes.append("Superpowers entry availability does not verify its source or pinned version")
+        recorded_metadata = metadata(project, clients)
+        contract = superpowers_contract()
+        if not (recorded_metadata["superpowers"] == "install"
+                and all(recorded_metadata[f"superpowers_{key}"] == value for key, value in contract.items())):
+            notes.append("Superpowers entry availability does not verify its source or pinned version")
+        else:
+            notes.append(f"Superpowers installation is recorded at verified {contract['tag']} ({contract['ref'][:12]})")
     notes.append("Local files do not verify agent session loading, remote CI, or review protection")
     return {"ready": not issues, "issues": list(dict.fromkeys(issues)), "clients": results, "git": facts,
             "workflow": {"id": workflow, "installed": installed}, "policy_ready": policy_ready,
@@ -506,11 +531,12 @@ def readiness(project, clients, agents, workflow):
 
 def links_plan(project, clients, agents):
     """Offer only missing client entries, preserving all existing Skill content."""
-    sources = {}
+    sources, installed_names = {}, set()
     for root in sorted({record["project_path"] for record in clients.values()}):
         names, errors, _ = skill_names(project, root)
         if errors:
             raise ValueError("Resolve unsafe existing Skills before adding client entries")
+        installed_names.update(names)
         for name in names:
             # BMAD tool adapters include manifest/command-pointer semantics;
             # do not substitute generic links for its official installer.
@@ -531,7 +557,9 @@ def links_plan(project, clients, agents):
             source = next(iter(candidates))
             links.append({"path": destination.relative_to(project).as_posix(),
                           "target": os.path.relpath(source, destination.parent)})
-    report = {"project": str(project), "links": links, "conflicts": conflicts}
+    curated = {path.name for path in (SOURCE / "skills").iterdir() if (path / "SKILL.md").is_file()}
+    report = {"project": str(project), "links": links, "conflicts": conflicts,
+              "installed_curated": sorted(installed_names & curated)}
     report["token"] = hashlib.sha256(json.dumps(report, sort_keys=True).encode()).hexdigest()
     return report
 
@@ -552,6 +580,7 @@ def main():
         command.add_argument("--workflow", choices=["none", *WORKFLOWS], required=True)
         if name == "save":
             command.add_argument("--expect", required=True)
+            command.add_argument("--verified-superpowers-ref")
     args = parser.parse_args()
     try:
         project = Path(args.project).resolve()
@@ -586,7 +615,8 @@ def main():
         else:
             validate_agents(args.agents, clients)
             # Both commands validate the snapshot before inspecting artifacts.
-            result = (save(project, clients, args.agents, args.workflow, args.expect) if args.command == "save"
+            result = (save(project, clients, args.agents, args.workflow, args.expect,
+                           args.verified_superpowers_ref) if args.command == "save"
                       else readiness(project, clients, args.agents, args.workflow))
         print(json.dumps(result))
     except (OSError, ValueError, KeyError, RuntimeError) as error:
