@@ -391,7 +391,7 @@ class LocalProjectTests(unittest.TestCase):
         self.assertFalse(report['ready'])
         self.assertTrue(report['clients'][0]['adapters_ready'], 'Core installation is separate from client adapters')
 
-    def test_bmad_valid_markers_and_universal_unsupported(self):
+    def test_bmad_valid_markers_and_universal_shared_skills(self):
         self.baseline()
         self.write(".claude/skills/bmad-help/SKILL.md")
         self.assertNotIn("bmad", self.cli("clients")["installed_workflows"])
@@ -400,7 +400,7 @@ class LocalProjectTests(unittest.TestCase):
         (self.project / "_bmad/core").mkdir()
         self.assertTrue(self.ready("bmad")["ready"])
         self.write(".agents/skills/bmad-help/SKILL.md")
-        self.assertFalse(self.ready("bmad", ("universal",))["ready"])
+        self.assertTrue(self.ready("bmad", ("universal",))["ready"])
         self.write("_bmad/_config/bmad-help.csv", "module,skill\ncore,other\n")
         self.assertFalse(self.ready("bmad")["ready"])
 

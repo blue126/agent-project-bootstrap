@@ -70,6 +70,27 @@ except (OSError, ValueError, RuntimeError) as error:
 PY
 }
 
+bmad_tools_for_agents() {
+  local agent
+  local universal=false shared_layout=false
+  local -a tools=()
+  for agent in "$@"; do
+    # Universal describes the shared .agents/skills target. Codex and OpenCode
+    # both already produce that target; otherwise use BMAD's Codex layout
+    # without recording Codex as a selected project client.
+    case "${agent}" in
+      universal) universal=true ;;
+      claude-code) tools+=(claude-code) ;;
+      codex|opencode) tools+=("${agent}"); shared_layout=true ;;
+      *) echo "Unknown BMAD client projection: ${agent}" >&2; return 1 ;;
+    esac
+  done
+  if [[ "${universal}" == true && "${shared_layout}" == false ]]; then
+    tools+=(codex)
+  fi
+  (IFS=,; printf '%s' "${tools[*]}")
+}
+
 ui_overview "${target_dir}"
 while :; do
   ask '开始接入？[y 开始，i 查看完整说明，n 退出]:'
@@ -114,22 +135,18 @@ elif [[ -n "${installed}" ]]; then
   selection="$(choose "${selector[@]}")" || exit $?
   [[ "${selection}" == keep ]] || active="${selection}"
 else
-  while :; do
-    selection="$(choose --title '选择工作方式' \
-      --option github-workflow '采用并安装 github-workflow · Git 分支、审阅与协作' \
-      --option superpowers '采用并安装 Superpowers · 功能设计、实现与验证' \
-      --option bmad '采用并安装 BMAD · 需求、架构与系统性迭代' \
-      --option none '保留现有方法，不新增框架' --selected none)" || exit $?
-    if [[ "${selection}" == bmad && " ${project_agents[*]} " == *' universal '* ]]; then
-      ui_warning 'BMAD 不支持 Universal：请选择其他工作方式，或退出后调整客户端。'
-      continue
-    fi
-    break
-  done
+  selection="$(choose --title '选择工作方式' \
+    --option github-workflow '采用并安装 github-workflow · Git 分支、审阅与协作' \
+    --option superpowers '采用并安装 Superpowers · 功能设计、实现与验证' \
+    --option bmad '采用并安装 BMAD · 需求、架构与系统性迭代' \
+    --option none '保留现有方法，不新增框架' --selected none)" || exit $?
   active="${selection}"
   install_workflow="${selection}"
 fi
 ui_text "工作方式：${active}"
+if [[ "${active}" == bmad && " ${project_agents[*]} " == *' universal '* ]]; then
+  ui_note 'Universal 只需要 BMAD 写入共享 .agents/skills；若未选择 Codex 或 OpenCode，向导才使用 BMAD 的 Codex 布局，且不会把 Codex 记为项目客户端。'
+fi
 ui_note '选择采用只会在之后确认项目配置时保存；安装或选择不自动执行任务。'
 
 ui_heading '阶段 3/5 · Skills 与可选能力'
@@ -148,9 +165,9 @@ fi
 if [[ "${install_workflow}" != none ]]; then
   ui_text "将安装 ${install_workflow}，目标客户端：${project_agents[*]}"
   if [[ "${install_workflow}" == bmad && " ${project_agents[*]} " == *' universal '* ]]; then
-    ui_warning 'BMAD 6.12.0 不支持 Universal tool ID。本次不安装；请重跑选择受支持客户端或保留现有方法。'
-    installation_failed=true
-  elif confirm '进入所选工作流安装器？'; then
+    ui_note 'Universal 只需要共享 .agents/skills；未选择 Codex/OpenCode 时才使用 BMAD 的 Codex 布局。OpenCode 命令指针仅在明确选择 OpenCode 时生成。'
+  fi
+  if confirm '进入所选工作流安装器？'; then
     mkdir -p "${target_dir}"
     case "${install_workflow}" in
       github-workflow)
@@ -178,7 +195,7 @@ if [[ "${install_workflow}" != none ]]; then
           ui_warning '发现旧 BMAD 入口或不安全的适配路径；未启动安装器，请先审阅安装状态。'
           installation_failed=true
         else
-          tools_csv="$(IFS=,; printf '%s' "${project_agents[*]}")"
+          tools_csv="$(bmad_tools_for_agents "${project_agents[@]}")" || installation_failed=true
           ui_text '模块、语言与项目设置仍在官方界面选择；不会传入 --yes。'
           run_installer npx bmad-method@6.12.0 install --directory "${target_dir}" --tools "${tools_csv}" || installation_failed=true
         fi ;;
@@ -188,12 +205,12 @@ fi
 
 # Existing BMAD adapters need its official metadata/command-pointer handling,
 # not generic Skill links or a blind reinstall.
-if [[ "${active}" == bmad && -f "${target_dir}/_bmad/_config/manifest.yaml" && " ${project_agents[*]} " != *' universal '* ]]; then
+if [[ "${active}" == bmad && -f "${target_dir}/_bmad/_config/manifest.yaml" ]]; then
   bmad_status="$(project_info readiness --agents "${project_agents[@]}" --workflow bmad)" || exit 1
   if [[ "$(printf '%s' "${bmad_status}" | jq '[.clients[].adapters_ready] | all')" != true ]]; then
     ui_warning 'BMAD 缺少所选客户端入口。补齐会调用官方 update；模块/tools 并集不保证定制文件不被改写。'
     if confirm '查看 BMAD 客户端补齐计划？'; then
-      tools_csv="$(IFS=,; printf '%s' "${project_agents[*]}")"
+      tools_csv="$(bmad_tools_for_agents "${project_agents[@]}")" || installation_failed=true
       bmad_helper="${repo_root}/skills/installbmad/scripts/installbmad.py"
       if before="$(python3 "${bmad_helper}" preflight --target "${target_dir}" --installer-version 6.12.0 --modules core --tools "${tools_csv}" --interactive)"; then
         printf '%s\n' "${before}"
