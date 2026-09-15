@@ -455,8 +455,6 @@ def readiness(project, clients, agents, workflow):
                 adapter_issues.append(f"{agent}: missing {root}/{required}/SKILL.md")
             if workflow == "bmad" and not bmad_installed(project):
                 client_issues.append(f"{agent}: BMAD manifest/help markers are incomplete")
-            if workflow == "bmad" and agent == "universal":
-                adapter_issues.append("Universal + BMAD is unsupported")
             if workflow == "bmad" and clients[agent].get("bmad_commands"):
                 pointer = f"{clients[agent]['bmad_commands']}/bmad-help.md"
                 try:

@@ -385,14 +385,20 @@ exec {shlex.quote(self.real_git)} "$@"
         self.assertEqual(len(self.calls()), 1)
         self.assertIn('本地配置就绪', text)
 
-    def test_unsupported_bmad_universal_returns_to_workflow_choice(self):
-        answers = self.answers(clients='universal')
-        position = next(i for i, (prompt, _) in enumerate(answers) if prompt == '选择工作方式')
-        answers.insert(position, ('选择工作方式', 'bmad'))
-        text = self.tty(answers)
-        self.assertIn('BMAD 不支持 Universal', text)
-        self.assertEqual(self.calls(), [])
-        self.assertFalse((self.target / '_bmad').exists())
+    def test_universal_bmad_uses_shared_skills_layout(self):
+        text = self.tty(self.answers(clients='universal', workflow='bmad', policy='n'))
+        self.assertIn('Universal 只需要 BMAD 写入共享 .agents/skills', text)
+        self.assertIn('OpenCode 命令指针仅在明确选择 OpenCode 时生成', text)
+        self.assertEqual(self.calls()[0]['argv'], [
+            'bmad-method@6.12.0', 'install', '--directory', str(self.target), '--tools', 'codex'])
+        self.assertNotIn('universal', self.calls()[0]['argv'])
+        self.assertFalse((self.target / '.opencode/commands').exists())
+        self.assertFalse((self.target / '.claude').exists())
+
+    def test_universal_reuses_selected_bmad_shared_layout(self):
+        self.tty(self.answers(clients='opencode universal', workflow='bmad', policy='n'))
+        self.assertEqual(self.calls()[0]['argv'], [
+            'bmad-method@6.12.0', 'install', '--directory', str(self.target), '--tools', 'opencode'])
 
     def test_multiple_detected_workflows_do_not_activate_from_order(self):
         for name in ('github-workflow', 'using-superpowers'):
