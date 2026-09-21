@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/blue126/agent-project-bootstrap/schemas/fixer-authorization.schema.json",
+  "$comment": "Documentation only: nothing loads this file. The runtime enforcement of this key set is the inline jq assertion in scripts/authorize-fixer-push.sh. Update both together.",
   "title": "Trusted Fixer pre-push authorization input",
   "type": "object",
   "additionalProperties": false,

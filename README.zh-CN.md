@@ -6,6 +6,27 @@
 
 选择 Agent 客户端、工作流和 Skills，建立项目规范与本地 Git，然后在所选客户端开始第一个任务。新项目和已有项目都可使用；已有配置会保留，必要变更先说明，**不自动提交或推送**。GitHub、CI 和自动审查是后续可选能力，不是本地开工的前置条件。
 
+## 特性
+
+- **一个入口，全套就绪。** 客户端、工作方式、Skills、项目规范和本地 Git 在一次交互式向导中配置完成。
+- **本地优先、无状态。** 不保存隐藏进度；重跑同一条命令会重新检查项目状态，且不自动提交或推送。
+- **已有项目保留。** 现有配置、分支、`origin` 和暂存区都保留；每一处改动在发生前都会先说明。
+- **可插拔工作流。** 采用 `github-workflow`、Superpowers 或 BMAD，或保留现有方法。
+- **GitHub 续程可选。** CI 骨架、自动审查与分支保护在本地总结后按需开启，不是前置条件。
+- **治理框架随附但未激活。** 敏感路径策略已写入，但在真实 CI 和 validation adapter 配置前不强制任何东西。
+
+## 环境要求
+
+| 工具 | 用途 | 说明 |
+|---|---|---|
+| Bash、Git | 核心向导 | macOS 或 Linux |
+| `jq` | 核心向导 | 处理 JSON |
+| Python 3.9+ | 核心向导 | |
+| Node.js / npm / npx | 安装 Skills 或工作流组件 | 驱动原生 `skills` 安装器 |
+| `gh`（已登录） | 可选 GitHub 续程 | 仅用于创建 / 连接 / 保护 |
+
+缺少依赖会明确提示；工具不会把它们安装到你的全局环境。
+
 **第一次使用？从下面的「快速开始」走完整流程。** 只想添加几个技能、不需要项目初始化时，再看[只安装 Skills](#只想安装-skills)。
 
 ## 快速开始：初始化项目
@@ -69,7 +90,7 @@ cd "/path/to/your/project"
 | 1. Agent 客户端 | Claude Code、Codex、OpenCode 或 Universal，可多选 | 明确的项目安装目标；已有记录只预选，不替你确认 |
 | 2. 工作方式 | 保留现有方法，或明确采用 github-workflow、Superpowers、BMAD | 一套选定的方法；检测或安装不自动执行任务 |
 | 3. Skills 与可选能力 | 安装工作流所需内容、添加普通 Skills、可选 Understand Anything | 客户端可发现的项目入口；已有 Skill 也能继续添加 |
-| 4. 项目规范与本地 Git | 确认必要配置、忽略规则差异，以及是否初始化本地 Git | 共享 Agent 规范、Git 资产政策和本地仓库；不提交、不推送 |
+| 4. 项目规范与本地 Git | 确认必要配置、忽略规则差异，以及是否初始化本地 Git | 共享 Agent 规范、Git 资产政策、一份未激活的治理框架骨架，以及本地仓库；不提交、不推送 |
 | 5. 本地总结 | 核对就绪和待处理项，决定是否继续 GitHub | 首个任务指引；无需先配置 CI 才能结束基础流程 |
 
 开场 `i` 可以查看完整的 **检查 / 可能改变 / 不会** 说明。说明页不启动安装或写入项目。`NO_COLOR`、窄终端和 `TERM=dumb` 提供可读回退，但不会让非交互 Agent 进程变成人类终端。目前向导提示使用中文；切换 README 语言不会改变终端界面语言。
@@ -78,6 +99,7 @@ cd "/path/to/your/project"
 - **工作流只采用一种**。`github-workflow` 适合 Git 分支/审阅与之后的 GitHub 协作；Superpowers 适合功能设计、实现和验证；BMAD 适合需求、架构和系统性迭代。保留现有方法不会停用未知规则，也不要求你为未知框架分类。
 - **Understand Anything 可跳过**。已有代码库（brownfield）通常更能受益，空项目（greenfield）可以等有代码后再用。它安装固定版本 runtime 和项目链接，不装全局插件、不自动分析；后续分析可能产生模型费用。
 - **先本地、后协作**。本地总结后才询问 GitHub；拒绝后没有 CI/Review/Ruleset 问卷。即使已有 GitHub origin，此前也不调用 `gh` 访问它。
+- **治理框架骨架已写入但未激活**。基础流程会写入 `.agent/governance/sensitive-paths.txt` 和 `.agent/bootstrap.yml` 的 `governance` 段。在项目有真实 CI 并配置 validation adapter 之前，它们不拦截任何路径、也不要求任何审查。项目 `AGENTS.md` 的「Governance scaffold」一节记录了这些文件的位置与激活路径。
 
 客户端路径与兼容范围：
 
@@ -89,6 +111,18 @@ cd "/path/to/your/project"
 | Universal | `.agents/skills/` | 共享目录模式，不是客户端应用，也不是安装全部客户端；BMAD 6.12.0 不支持此 tool ID |
 
 更多交互和已有项目说明见[起步指南](examples/onboarding.md)。
+
+## 使用示例
+
+下面的配方把一个目标对应到向导中的决策和覆盖它的命令章节。请在普通终端运行命令，不要用 Agent 拥有的 PTY。
+
+- **用 Claude Code + GitHub workflow 启动全新项目。** 按[快速开始](#快速开始初始化项目)：克隆工具，`cd` 进入空项目目录，运行 `"$HOME/agent-project-bootstrap/scripts/bootstrap.sh"`，选择 `claude-code` 和 `github-workflow`。总结会报告已安装的 Skill 入口、规范与 Git 状态；在新的 Claude Code 会话中打开项目，先让 Agent 确认它读取到的内容，再授权开发。
+- **在已有项目上 bootstrap 而不打扰暂存工作。** `cd` 进入项目的 Git 根目录（不是子目录），运行同一条 bootstrap 命令。已有的 `origin`、分支、index 以及 `AGENTS.md` / `.gitignore` 内容都保留；已暂存文件保持暂存。
+- **给已配置好的项目添加一个 Skill。** 使用[只安装 Skills 入口](#只想安装-skills)：在项目根目录运行 `npx skills add https://github.com/blue126/agent-project-bootstrap`。它不会重跑项目规范或 Git 设置。
+- **工具更新后刷新受管文件。** 在项目目录运行 `"$HOME/agent-project-bootstrap/scripts/bootstrap.sh" --update`（见[更新与恢复](#更新与恢复)）。你修改过的文件会保留并列出；不提交任何内容。
+- **在新机器上复用一个项目。** clone 项目、获取工具，再运行 `"$HOME/agent-project-bootstrap/scripts/rehydrate.sh"` 重建可恢复的 runtime 与客户端入口；需要人工终端完成的 Skills / BMAD 步骤会打印出来，不会被静默完成。
+
+每个配方都结束在一个本地、可审阅的状态。GitHub、CI 和保护是独立的、可选的续程步骤。
 
 ## 只想安装 Skills？
 
@@ -248,8 +282,24 @@ Claude Auto Review 需要用户在项目的 Claude Code 会话运行官方 `/ins
 ## 项目结构与维护
 
 - `AGENTS.md` 是共享政策入口；选择 Claude 时用 `CLAUDE.md` 引用它。
-- `.agent/policies/` 放下游项目规范，`.agent/bootstrap.yml` 记录明确偏好、受管文件哈希与可验证的安装信息，不存向导进度或授权。
+- `.agent/policies/` 放下游项目规范，`.agent/governance/` 放治理框架骨架的敏感路径策略；两者都由基础流程安装，本身不强制任何东西。`.agent/bootstrap.yml` 记录明确偏好、治理状态、受管文件哈希与可验证的安装信息，不存向导进度或授权。
 - Understand Anything 使用固定 `v2.9.0` / immutable ref 的项目 runtime 和兼容补丁；Superpowers 使用受管的 `v6.3.0` / immutable ref；BMAD 安装和工作流执行分开。
 - 其他第三方来源、许可和定制见 `third-party-sources.yml`；受管集成见 `integrations/`。`human-3-development-assessor` 无上游许可证，只提供 `Visit upstream`，不捆绑、复制、patch、自动下载或一键安装。
 
-本仓库是工具分发源码，不代表本 checkout 已安装或启用了组件。自身代码使用 MIT；bundled third-party 内容保留原许可证，见 [第三方声明](THIRD_PARTY_NOTICES.md)。维护、测试与打包见[贡献指南](CONTRIBUTING.md)。不要提交凭据、个人状态或私密转录；正式项目报告应经审阅、脱敏和许可检查后保留。
+## 贡献指南
+
+欢迎通过 GitHub issue 和 pull request 参与贡献。贡献前：
+
+1. 阅读 `AGENTS.md`——它是跨 Agent 的项目规则。
+2. 从远端默认分支创建独立分支；不直接修改默认分支。
+3. 保持 public core 技术栈无关；项目专属 validation 放在 consumer adapter。
+4. 新增第三方内容必须记录 source、immutable ref、license 和 copyright。
+5. 不提交 secret、个人资料、内部 URL、consumer 配置、对话转录或持久 memory。
+
+本地检查（`shellcheck`、`bash -n`、`python3 -m compileall`）尽早获得反馈；完整测试与 CI 提供评审与合并所需的独立证据。维护、测试与打包的完整说明见[贡献指南](CONTRIBUTING.md)。
+
+治理敏感路径不由自动 fixer 修改或自动合并；PR 应说明行为变化、风险、验证结果和未执行的检查。
+
+## 许可证
+
+本仓库是工具分发源码，不代表本 checkout 已安装或启用了组件。自身代码使用 MIT；bundled third-party 内容保留原许可证，见 [第三方声明](THIRD_PARTY_NOTICES.md)。不要提交凭据、个人状态或私密转录；正式项目报告应经审阅、脱敏和许可检查后保留。

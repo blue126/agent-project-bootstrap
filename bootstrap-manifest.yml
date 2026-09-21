@@ -5,6 +5,10 @@ source_repository: blue126/agent-project-bootstrap
 # Bootstrap records a hash of every project file it writes in the target's
 # .agent/bootstrap.yml. --update replaces only files still matching that hash;
 # anything you edited is preserved unless --force is given.
+#
+# Documentation only: no code reads this block at runtime. The authoritative
+# list of managed files is the files=() array in scripts/bootstrap.sh. Keep the
+# two in step when adding, renaming, or removing a managed file.
 project_files:
   - source: templates/AGENTS.md
     destination: AGENTS.md

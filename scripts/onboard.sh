@@ -164,6 +164,7 @@ if [[ "$(printf '%s' "${entry_plan}" | jq '.links | length')" -gt 0 ]]; then
 fi
 if [[ "${install_workflow}" != none ]]; then
   ui_text "将安装 ${install_workflow}，目标客户端：${project_agents[*]}"
+  ui_note '安装器只把该工作流写入项目入口，不会执行它的任何任务；完成后本向导会核对是否留下可验证入口。'
   if [[ "${install_workflow}" == bmad && " ${project_agents[*]} " == *' universal '* ]]; then
     ui_note 'Universal 只需要共享 .agents/skills；未选择 Codex/OpenCode 时才使用 BMAD 的 Codex 布局。OpenCode 命令指针仅在明确选择 OpenCode 时生成。'
   fi
@@ -243,7 +244,7 @@ if [[ "${superpowers_verified_ref}" != "" ]]; then
 else
   ui_text '已有 Skills 保留；你仍可添加其他能力或为所选客户端安装入口。'
 fi
-ui_text '官方界面负责搜索、多选、安装作用域与复制/链接。推荐选 Project；Global 不算项目入口已就绪。'
+ui_install_briefing
 if confirm '进入技能选择？'; then
   mkdir -p "${target_dir}"
   run_installer npx skills@1.5.23 add "${repo_root}" --agent "${project_agents[@]}" || installation_failed=true
@@ -316,6 +317,21 @@ if [[ "$(printf '%s' "${readiness}" | jq -r '.git.head // ""')" == '' ]]; then
 else ui_text '版本状态：已有提交；本次改动未自动暂存或提交。'; fi
 ui_text "忽略规则与政策引用：${git_assets_status}" '客户端加载：待所选客户端的新会话确认；文件存在不等于已加载。' \
   '首次提交检查：未执行；提交前须检查资产范围、敏感信息、大文件与符号链接。'
+
+# Every basic flow writes the governance scaffold. Report it as present but
+# inactive instead of implying that a gate exists.
+if [[ -f "${target_dir}/.agent/bootstrap.yml" ]]; then
+  reviewer="$(printf '%s' "${persisted}" | jq -r '.governance_reviewer // ""')"
+  validation="$(printf '%s' "${persisted}" | jq -r '.governance_validation // ""')"
+  auto_merge="$(printf '%s' "${persisted}" | jq -r '.governance_auto_merge // ""')"
+  governance_summary="reviewer ${reviewer:-none} · validation ${validation:-none} · auto_merge ${auto_merge:-none}"
+  ui_section '治理框架 · 已写入，未激活'
+  ui_text '.agent/governance/sensitive-paths.txt — 敏感路径策略，供未来门禁使用；当前不拦截任何改动。' \
+    ".agent/bootstrap.yml → governance：${governance_summary}" \
+    '激活路径：真实 CI 在提交上跑通 → 配置 validation adapter → 重跑本命令设置 required checks。'
+  ui_note '骨架就位不代表验证、审查或分支保护已经生效；缺少证据时保持 pending 或 blocked。'
+fi
+
 ui_section '下一步'
 ui_text '1. 在所选客户端的新会话打开这个项目，先确认 AGENTS.md 与 Skills 被读取。' \
   '2. 让 Agent 说明它读取到的项目规则与可用能力；缺项先处理，不自动开发。'

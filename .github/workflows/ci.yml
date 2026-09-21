@@ -28,7 +28,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
       - name: Lint shell scripts
-        run: shellcheck -S style scripts/*.sh tests/*.sh
+        run: shellcheck -S style scripts/*.sh scripts/lib/*.sh tests/*.sh
 
   bootstrap-validation:
     name: bootstrap-validation (${{ matrix.os }})
@@ -47,7 +47,10 @@ jobs:
           persist-credentials: false
 
       - name: Validate shell syntax
-        run: bash -n scripts/*.sh tests/*.sh
+        run: bash -n scripts/*.sh scripts/lib/*.sh tests/*.sh
+
+      - name: Validate Python syntax
+        run: python3 -m compileall -q scripts tests
 
       - name: Validate Ruleset JSON
         run: jq empty github/rulesets/protect-main.json

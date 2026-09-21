@@ -13,14 +13,18 @@
 
 ## 验证
 
-本地检查用于尽早获得反馈，应按改动范围选择；它们不能替代 CI。修改 Shell 脚本时优先运行静态检查和语法检查，修改特定功能时优先运行对应测试；准备提交 PR 或需要完整本地确认时，再运行全部仓库测试。
+本地检查用于尽早获得反馈，应按改动范围选择；它们不能替代 CI。本地工具链需要 `shellcheck`、`ripgrep`（`rg`）、`jq` 和 Python 3；缺少依赖时检查会明确失败，不会静默跳过——安全与就绪类断言依赖 `rg`，缺失时它们无法安全地给出结论。修改 Shell 脚本时优先运行静态检查和语法检查，修改特定功能时优先运行对应测试；准备提交 PR 或需要完整本地确认时，再运行全部仓库测试。
 
 ```bash
-shellcheck -S style scripts/*.sh tests/*.sh
+shellcheck -S style scripts/*.sh scripts/lib/*.sh tests/*.sh
 ```
 
 ```bash
-bash -n scripts/*.sh tests/*.sh
+bash -n scripts/*.sh scripts/lib/*.sh tests/*.sh
+```
+
+```bash
+python3 -m compileall -q scripts tests
 ```
 
 修改 `github/rulesets/protect-main.json` 后，运行：
@@ -68,6 +72,8 @@ bash tests/test-git-ignore.sh
 通用 `Protect main` 只管理 bootstrap 基础保护。本仓库另用独立的 `Self CI gates` 强制要求 `shellcheck`、`bootstrap-validation (ubuntu-latest)`、`bootstrap-validation (macos-latest)`，绑定 GitHub Actions App `15368`，并要求分支基于最新 main。重命名这些 CI 检查时，必须同步更新 `github/rulesets/self-ci-gates.json`，避免 PR 一直等待旧名称。
 
 此 profile **仅适用于 `blue126/agent-project-bootstrap/main`**，不应用于下游项目，不改写原 `Protect main`、审批数量或 `.agent/bootstrap.yml` 的 adapter/AI 治理状态。观察型 `governance-observe` 不是硬门槛。
+
+`repo-validation` 与 `governance-observe` 都是分发给 consumer 的可复用工作流，pin 记录在 `releases/`。**`repo-validation` 在本仓库没有 caller、不会执行**，它的结构只由单元测试按文本锁定，没有在真实 adapter 上运行过。本仓库的 `.agent/bootstrap.yml` 保持 `validation: pending` 且未绑定 adapter，所以补上 caller 会立刻停在 "Require a current trusted adapter binding" 一步。要让它在此真实运行，需先自配 validation adapter 并把治理状态改为 `configured`——那是治理敏感改动，不是配置疏漏。
 
 先检查计划（允许远端读取，不会写 GitHub；不是离线模式）：
 

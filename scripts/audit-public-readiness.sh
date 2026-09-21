@@ -34,6 +34,13 @@ report_paths() {
   if [[ "${has_git}" == true ]]; then
     paths="$(git grep -Il -E "${pattern}" -- . ':(exclude)scripts/audit-public-readiness.sh' || true)"
   else
+    # Without Git the scan depends on ripgrep; a missing tool would otherwise
+    # report every path as clean.
+    command -v rg >/dev/null 2>&1 || {
+      echo "BLOCKED ${label}: ripgrep (rg) is required to audit a tree without Git"
+      failed=true
+      return 0
+    }
     paths="$(rg -l -uu -g '!.git/**' -g '!scripts/audit-public-readiness.sh' "${pattern}" . || true)"
   fi
   if [[ -n "${paths}" ]]; then
