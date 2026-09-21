@@ -6,6 +6,27 @@
 
 Choose your agent clients, workflow, and Skills; establish project policies and local Git; then start your first task in your selected client. Works with both new and existing projects. Existing configuration is preserved, changes are explained before they happen, and **nothing is committed or pushed automatically**. GitHub, CI, and automated review are optional next steps—not prerequisites for working locally.
 
+## Features
+
+- **One entry, full setup.** Clients, workflow, Skills, project policies, and local Git are configured in a single interactive wizard.
+- **Local-first and stateless.** No hidden progress is stored; rerunning the command rechecks project state. Nothing is committed or pushed automatically.
+- **Existing projects are preserved.** Current configuration, branches, `origin`, and the staging area are kept; every change is explained before it happens.
+- **Pluggable workflows.** Adopt `github-workflow`, Superpowers, or BMAD—or keep your existing approach.
+- **Optional GitHub continuation.** CI skeleton, automated review, and branch protection are opt-in after the local summary, never prerequisites.
+- **Governance scaffold included but inactive.** A sensitive-path policy is written, but it enforces nothing until real CI and a validation adapter are configured.
+
+## Prerequisites
+
+| Tool | Required for | Notes |
+|---|---|---|
+| Bash, Git | Core wizard | macOS or Linux |
+| `jq` | Core wizard | JSON handling |
+| Python 3.9+ | Core wizard | |
+| Node.js / npm / npx | Installing Skills or workflow components | drives the native `skills` installer |
+| `gh` (authenticated) | Optional GitHub continuation | only for create / connect / protection |
+
+Missing dependencies are reported explicitly; the toolkit never installs them into your global environment.
+
 **First time here? Follow the full quick start below.** If you only want a few skills rather than project initialization, see [Skills-only installation](#only-want-to-install-skills).
 
 ## Quick start: initialize a project
@@ -69,7 +90,7 @@ If you do not need GitHub, finish at the final prompt. To add clients, Skills, o
 | 1. Agent clients | Claude Code, Codex, OpenCode, or Universal; multiple selections allowed | Explicit project installation targets; saved choices are preselected, not automatically confirmed |
 | 2. Workflow | Keep your existing approach, or explicitly adopt github-workflow, Superpowers, or BMAD | A selected working method; detection or installation does not execute tasks |
 | 3. Skills and optional tools | Install workflow components, add ordinary Skills, optionally install Understand Anything | Project entries discoverable by the selected clients; existing Skills do not prevent additions |
-| 4. Project policies and local Git | Confirm configuration, ignore-rule changes, and local Git initialization | Shared agent policies, Git asset rules, and a local repository; no automatic commits or pushes |
+| 4. Project policies and local Git | Confirm configuration, ignore-rule changes, and local Git initialization | Shared agent policies, Git asset rules, an inactive governance scaffold, and a local repository; no automatic commits or pushes |
 | 5. Local summary | Check readiness and pending items; decide whether to continue with GitHub | First-task guidance; CI setup is not required to finish the basic flow |
 
 At the opening prompt, `i` displays the full **Checks / Possible changes / Will not do** explanation. Reading this page does not launch installers or write project files. `NO_COLOR`, narrow terminals, and `TERM=dumb` have readable fallbacks, but do not turn an agent-owned process into a human terminal. The wizard currently displays Chinese guidance; changing the README language does not change the terminal UI language.
@@ -78,6 +99,7 @@ At the opening prompt, `i` displays the full **Checks / Possible changes / Will 
 - **Adopt one workflow.** `github-workflow` covers Git branches, review, and later GitHub collaboration; Superpowers covers feature design, implementation, and validation; BMAD covers requirements, architecture, and structured iteration. Keeping your existing approach does not disable unknown rules or require classifying an unknown framework.
 - **Understand Anything is optional.** Existing codebases (brownfield) usually benefit more; empty projects (greenfield) can wait until there is code to analyze. It installs a pinned runtime and project links, not global plugins. It does not automatically analyze code; later analysis may incur model costs.
 - **Local setup comes before collaboration.** GitHub is offered only after the local summary. Declining ends the flow without a CI/review/ruleset questionnaire. Even an existing GitHub origin is not contacted through `gh` before that opt-in.
+- **The governance scaffold is written but inactive.** Every basic flow installs `.agent/governance/sensitive-paths.txt` and a `governance:` state block in `.agent/bootstrap.yml`. They enforce nothing—no path is blocked and no review is required—until the project has real CI and a configured validation adapter. The project's own `AGENTS.md` documents this under "Governance scaffold".
 
 Client paths and compatibility:
 
@@ -89,6 +111,18 @@ Client paths and compatibility:
 | Universal | `.agents/skills/` | Shared-directory mode, not a client application or “install all”; BMAD 6.12.0 does not support this tool ID |
 
 See the [onboarding guide (Chinese)](examples/onboarding.md) for more interaction details and existing-project guidance.
+
+## Usage examples
+
+These recipes map a goal to the wizard decisions and the command section that covers it. Run the commands in a regular terminal, not an agent-owned PTY.
+
+- **Start a brand-new project with Claude Code + GitHub workflow.** Follow the [quick start](#quick-start-initialize-a-project): clone the toolkit, `cd` into an empty project directory, run `"$HOME/agent-project-bootstrap/scripts/bootstrap.sh"`, then choose `claude-code` and `github-workflow`. The summary reports installed Skill entries, policies, and Git state; open the project in a new Claude Code session and let the agent confirm what it loaded before authorizing work.
+- **Bootstrap an existing project without disturbing staged work.** `cd` into the project's Git root (not a subdirectory) and run the same bootstrap command. Existing `origin`, branches, index, and `AGENTS.md` / `.gitignore` content are preserved; staged files stay staged.
+- **Add a Skill to an already-set-up project.** Use the [Skills-only entry point](#only-want-to-install-skills): `npx skills add https://github.com/blue126/agent-project-bootstrap` from the project root. This does not re-run project policy or Git setup.
+- **Refresh managed files after the toolkit updates.** From the project directory run `"$HOME/agent-project-bootstrap/scripts/bootstrap.sh" --update` (see [Updating and restoring](#updating-and-restoring)). Files you edited are preserved and listed; nothing is committed.
+- **Reuse a project on a new machine.** Clone the project, obtain the toolkit, then run `"$HOME/agent-project-bootstrap/scripts/rehydrate.sh"` to rebuild recoverable runtimes and client entries; Skills and BMAD steps that need a human terminal are printed, not silently completed.
+
+Each recipe ends in a local, reviewable state. GitHub, CI, and protection are separate, opt-in continuation steps.
 
 ## Only want to install Skills?
 
@@ -248,8 +282,24 @@ Project ignore/allow comments cannot silently narrow that scan. Projects with ac
 ## Project structure and maintenance
 
 - `AGENTS.md` is the shared policy entry point; when Claude is selected, `CLAUDE.md` references it.
-- `.agent/policies/` contains downstream project policies. `.agent/bootstrap.yml` records explicit preferences, managed-file hashes, and verifiable installation information—not wizard progress or authorization.
+- `.agent/policies/` contains downstream project policies, and `.agent/governance/` holds the governance scaffold's sensitive-path policy. Both are installed by the basic flow and enforce nothing on their own. `.agent/bootstrap.yml` records explicit preferences, the governance state, managed-file hashes, and verifiable installation information—not wizard progress or authorization.
 - Understand Anything uses a project runtime pinned to `v2.9.0` and an immutable ref, plus compatibility patches. Superpowers uses managed `v6.3.0` and an immutable ref. BMAD installation is separate from workflow execution.
 - Other third-party provenance, licensing, and customization are recorded in `third-party-sources.yml`; managed integrations live in `integrations/`. `human-3-development-assessor` has no upstream license and is listed as `Visit upstream` only: it is not bundled, copied, patched, automatically downloaded, or installed with one click.
 
-This repository distributes toolkit source; it does not mean components are installed or active in this checkout. Original project code is MIT-licensed; bundled third-party content retains its original licenses—see [third-party notices](THIRD_PARTY_NOTICES.md). See the [contribution guide (Chinese)](CONTRIBUTING.md) for maintenance, testing, and packaging. Do not commit credentials, personal state, or private transcripts. Preserve formal project reports after review, sanitization, and license checks.
+## Contributing
+
+Contributions via GitHub issues and pull requests are welcome. Before contributing:
+
+1. Read `AGENTS.md`—it is the cross-agent project policy.
+2. Branch from the default remote branch; never commit directly to it.
+3. Keep the public core tech-stack-agnostic; put project-specific validation in consumer adapters.
+4. Record source, immutable ref, license, and copyright for any new third-party content.
+5. Never commit secrets, personal data, internal URLs, consumer config, transcripts, or persistent memory.
+
+Local checks (`shellcheck`, `bash -n`, `python3 -m compileall`) give early feedback; the full test suite and CI provide independent evidence for review and merge. See the full [contribution guide](CONTRIBUTING.md) for maintenance, testing, and packaging.
+
+Governance-sensitive paths are not modified by auto-fixers or auto-merge; PRs should state behavior changes, risks, verification results, and any checks not run.
+
+## License
+
+This repository distributes toolkit source; it does not mean components are installed or active in this checkout. Original project code is MIT-licensed; bundled third-party content retains its original licenses—see [third-party notices](THIRD_PARTY_NOTICES.md). Do not commit credentials, personal state, or private transcripts. Preserve formal project reports after review, sanitization, and license checks.

@@ -2,6 +2,9 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# The credential-boundary assertion below shells out to ripgrep. A missing tool
+# would return 127 and read as "no violation", so fail closed here instead.
+command -v rg >/dev/null 2>&1 || { echo "ripgrep (rg) is required by the security boundary assertions" >&2; exit 1; }
 observe="${repo_root}/.github/workflows/governance-observe.yml"
 caller="${repo_root}/.github/workflows/agent-governance-observe.yml"
 test_root="$(mktemp -d)"

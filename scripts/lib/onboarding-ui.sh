@@ -22,6 +22,14 @@ ui_text() { printf '  %s\n' "$@"; }
 ui_note() { printf '  %s%s%s\n' "${ui_muted:-}" "$1" "${ui_reset:-}"; }
 ui_warning() { printf '\n  %s! %s%s\n' "${ui_warning_color:-}" "$1" "${ui_reset:-}"; }
 
+ui_install_briefing() {
+  ui_note '接下来是原生安装界面，它会依次询问：装哪些条目、装到哪些客户端、作用域（Project/Global）、以及复制还是链接。'
+  ui_text '作用域选 Project：写入本项目目录，能被所选客户端发现，并随 Git 提交。' \
+    'Global 写入用户主目录，本项目不算就绪，也会影响你的其他项目。' \
+    '复制留下可提交的项目资产；链接指向本机路径，只有可复现时才应提交。' \
+    '不确定就选 Project + 复制；安装可以重来，重跑本命令即可重新检查。'
+}
+
 ui_stage_card() {
   printf '\n  %s[%s/5] %s%s\n' "${ui_bold:-}" "$1" "$2" "${ui_reset:-}"
   printf '      %s\n' "$3"

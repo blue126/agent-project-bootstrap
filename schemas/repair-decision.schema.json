@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/blue126/agent-project-bootstrap/schemas/repair-decision.schema.json",
+  "$comment": "Documentation only: nothing loads this file. The runtime enforcement of these key sets is the inline jq assertion in scripts/evaluate-repair-decision.sh. Update both together.",
   "title": "Deterministic repair-loop decision input",
   "type": "object",
   "additionalProperties": false,

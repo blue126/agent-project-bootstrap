@@ -177,6 +177,10 @@ def metadata(project, clients):
     for name, keys in {
         "curated_skills": ("components", "curated_skills"),
         "workflow_pack": ("components", "workflow_pack"),
+        # Governance scaffold state: recorded at bootstrap, inactive until configured.
+        "governance_reviewer": ("governance", "reviewer"),
+        "governance_validation": ("governance", "validation"),
+        "governance_auto_merge": ("governance", "auto_merge"),
         "understand_anything": ("integrations", "understand_anything", "installation"),
         "superpowers": ("superpowers", "installation"),
         "superpowers_upstream": ("superpowers", "upstream"),

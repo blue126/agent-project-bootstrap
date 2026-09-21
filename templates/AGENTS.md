@@ -32,6 +32,21 @@ The user must run interactive installers in a regular human terminal. Never run 
 
 Onboarding may explicitly create or connect a GitHub repository, but does not stage, commit, or push. Local validation, CI, review, and branch protection require separate evidence; a completed prompt is not verified governance. Sensitive governance changes require human handling. `--update` preserves metadata and does not authorize installation or Git mutation.
 
+## Governance scaffold
+
+Bootstrap writes a governance scaffold into this project. It is **inactive by default** and enforces nothing until it is configured.
+
+- `.agent/governance/sensitive-paths.txt` lists path patterns that require human confirmation before a change proceeds. Read it before proposing changes to CI configuration, rulesets, or bootstrap configuration. It is an input to human review, not a secret scanner, and it does not block anything on its own.
+- `.agent/bootstrap.yml` → `governance:` records the current state: `reviewer`, `fixer`, `validation`, `validation_mode`, `validation_adapter_manifest`, `validation_adapter_sha256`, `auto_merge`, `sensitive_paths`, and `runtime_sha`. At bootstrap these are `none`, `pending`, and `disabled`.
+
+The presence of these files is not evidence that validation, review, or branch protection is active. To activate the scaffold:
+
+1. Give the project real CI that passes on an actual commit.
+2. Configure a validation adapter so the project's own checks act as the gate.
+3. Re-run the bootstrap command to configure required checks against real GitHub Actions evidence.
+
+Until then, missing evidence stays pending or blocked, and must never be reported as verified.
+
 ## Project-specific instructions
 
 - `components.claude_auto_review: selected` is a reminder only. It does not authorize GitHub App installation, authentication, secret configuration, remote mutation, or running /install-github-app; the user must run the official Claude Code installer themselves.

@@ -10,6 +10,11 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# The negative assertion at the end of this file shells out to ripgrep. Without
+# it the command returns 127 and the guard would silently pass, so require the
+# tool up front instead of reporting a false pass.
+command -v rg >/dev/null 2>&1 || { echo "ripgrep (rg) is required by the policy text assertions" >&2; exit 1; }
+
 grep -q 'explicitly invokes github-workflow' "${repo_root}/skills/github-workflow/SKILL.md"
 grep -q 'mutually_exclusive: true' "${repo_root}/bootstrap-manifest.yml"
 grep -q 'fork: false' "${repo_root}/integrations/superpowers/integration.yml"
@@ -89,5 +94,17 @@ grep -Fq 'greenfield' "${repo_root}/examples/onboarding.md"
 grep -Fq "本仓库的 \`--profile self\` 只适用于 \`blue126/agent-project-bootstrap/main\`" "${repo_root}/examples/onboarding.md"
 grep -Fq '治理敏感改动由人工处理' "${repo_root}/CONTRIBUTING.md"
 grep -Fq '不应用于下游项目' "${repo_root}/CONTRIBUTING.md"
+
+# Every project receives the governance scaffold, but it stays inactive. Both
+# halves must remain stated, or a project silently gets governance files that
+# nobody was told about.
+grep -Fq 'inactive by default' "${repo_root}/templates/AGENTS.md"
+grep -Fq '.agent/governance/sensitive-paths.txt' "${repo_root}/templates/AGENTS.md"
+grep -Fq 'must never be reported as verified' "${repo_root}/templates/AGENTS.md"
+grep -Fq '治理框架骨架' "${repo_root}/examples/onboarding.md"
+grep -Fq '治理框架 · 已写入，未激活' "${repo_root}/scripts/onboard.sh"
+grep -Fq 'ui_install_briefing' "${repo_root}/scripts/onboard.sh"
+grep -Fq 'ui_install_briefing' "${repo_root}/scripts/lib/onboarding-ui.sh"
+grep -Fq 'governance_reviewer' "${repo_root}/scripts/lib/onboarding-project.py"
 
 echo "policy text tests passed"

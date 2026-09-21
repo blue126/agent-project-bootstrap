@@ -444,13 +444,16 @@ if [[ -z "${workflow}" ]]; then
     echo "  1) none"
     echo "  2) github-workflow"
     echo "  3) superpowers"
+    echo "  4) bmad"
+    echo "This path records the chosen workflow only; bmad has no installer here. Use the onboarding wizard to install one."
     while [[ -z "${workflow}" ]]; do
-      read -r -p "Workflow [1-3]: " workflow_choice
+      read -r -p "Workflow [1-4]: " workflow_choice
       case "${workflow_choice}" in
         1) workflow="none" ;;
         2) workflow="github-workflow" ;;
         3) workflow="superpowers" ;;
-        *) echo "Choose 1, 2, or 3." >&2 ;;
+        4) workflow="bmad" ;;
+        *) echo "Choose 1, 2, 3, or 4." >&2 ;;
       esac
     done
   else
@@ -463,7 +466,7 @@ fi
 case "${workflow}" in
   none|github-workflow|superpowers|bmad) ;;
   *)
-    echo "Invalid workflow '${workflow}'; choose none, github-workflow, or superpowers" >&2
+    echo "Invalid workflow '${workflow}'; choose none, github-workflow, superpowers, or bmad" >&2
     exit 2
     ;;
 esac

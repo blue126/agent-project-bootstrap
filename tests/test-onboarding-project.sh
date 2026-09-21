@@ -159,7 +159,8 @@ class LocalProjectTests(unittest.TestCase):
         self.assertEqual(self.cli('metadata'), {
             'selected': [], 'workflow': 'none', 'config_sha256': None,
             'curated_skills': '', 'workflow_pack': '', 'understand_anything': '', 'superpowers': '',
-            'superpowers_upstream': '', 'superpowers_tag': '', 'superpowers_ref': ''})
+            'superpowers_upstream': '', 'superpowers_tag': '', 'superpowers_ref': '',
+            'governance_reviewer': '', 'governance_validation': '', 'governance_auto_merge': ''})
         self.config_file('project_agents:\t["codex", "claude-code"] # selected\n'
                          'integrations:\n  understand_anything:\n    installation:\t"install"\t# recorded\n'
                          "superpowers:\n  installation: 'install # preserved scalar'\n"
@@ -181,7 +182,16 @@ class LocalProjectTests(unittest.TestCase):
                                'config_sha256': hashlib.sha256(self.config.read_bytes()).hexdigest(),
                                'curated_skills': 'skip', 'workflow_pack': 'none',
                                'understand_anything': 'install', 'superpowers': 'install # preserved scalar',
-                               'superpowers_upstream': '', 'superpowers_tag': '', 'superpowers_ref': ''})
+                               'superpowers_upstream': '', 'superpowers_tag': '', 'superpowers_ref': '',
+                               'governance_reviewer': '', 'governance_validation': '', 'governance_auto_merge': ''})
+        # Governance scaffold state is read back from the recorded block instead
+        # of being assumed, so the summary cannot claim an inactive gate is live.
+        self.config_file('governance:\n  reviewer: none\n  validation: pending\n'
+                         '  auto_merge: disabled\n  runtime_sha: none\n')
+        recorded = self.cli('metadata')
+        self.assertEqual([recorded[key] for key in ('governance_reviewer', 'governance_validation',
+                                                    'governance_auto_merge')],
+                         ['none', 'pending', 'disabled'])
 
     def test_readiness_requires_metadata_but_allows_prewrite_workflow_check(self):
         self.baseline()

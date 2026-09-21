@@ -1,6 +1,10 @@
 # 从这里开始：先准备本地 Agent coding 项目
 
-Bootstrap 的目标是让你获得客户端适配、工作方法、Skills、项目规则和本地 Git。它不会自动开始开发、提交代码或接入整套 GitHub 治理。本仓库是分发源码，看到目录不等于组件已安装到你的项目。
+Bootstrap 的目标是让你获得客户端适配、工作方法、Skills、项目规则和本地 Git。它不会自动开始开发、提交代码，也不会启用任何强制检查。
+
+基础流程会写入一份**治理框架骨架**（`.agent/governance/sensitive-paths.txt` 与 `.agent/bootstrap.yml` 的 `governance` 段），但默认全部未激活——不拦截改动、不要求审查、不构成门禁。激活顺序是：真实 CI 在提交上跑通 → 配置 validation adapter → 重跑本命令设置 required checks。项目 `AGENTS.md` 的 **Governance scaffold** 一节记录了同一份说明，Agent 会在项目内读到它。
+
+本仓库是分发源码，看到目录不等于组件已安装到你的项目。
 
 ## 一个入口
 

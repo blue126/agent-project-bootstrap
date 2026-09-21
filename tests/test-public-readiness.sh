@@ -3,6 +3,10 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# The supply-chain and credential scans below shell out to ripgrep. Without it
+# they would return 127 and read as "nothing found", so fail closed up front.
+command -v rg >/dev/null 2>&1 || { echo "ripgrep (rg) is required by the public readiness assertions" >&2; exit 1; }
+
 for required_file in LICENSE THIRD_PARTY_NOTICES.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md; do
   test -s "${repo_root}/${required_file}" || {
     echo "Missing public project file: ${required_file}" >&2
