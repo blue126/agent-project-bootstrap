@@ -11,6 +11,32 @@
 - Installing this policy is not evidence that the first commit's contents have been reviewed or verified. Report policy installation, asset review, local validation, CI, review, and protection as separate evidence; leave missing evidence pending or blocked.
 - Do not discard, overwrite, or rewrite user work unless the user explicitly authorizes the exact destructive action. A merged branch or pull request never justifies deleting uncommitted, untracked, or ignored work; inspect and preserve it before branch or worktree cleanup.
 
+## Task worktree lifecycle
+
+This is an Agent behavior policy, not a local cleanup CLI, daemon, or schedule. Once adopted by the project, it authorizes cleanup without asking for permission each time, but only when every check below passes. It does not authorize merging a PR: merge still requires explicit user authorization.
+
+### Scope and timing
+
+- Apply only to worktrees and local branches created by an Agent for an identified task in this repository. Establish ownership and the associated repository/PR from reliable task records; a branch name or directory name alone is not proof.
+- Never remove the primary checkout, user-created worktrees or branches, worktrees used by another running session, or remote branches. Remote branch cleanup belongs to governance's remote cleanup. If ownership or session use cannot be established, preserve the resource and report why.
+- Worktrees with a runtime-managed lifecycle, such as Claude Code's `.claude/worktrees/`, belong to that runtime. Exclude them from this procedure; do not duplicate its cleanup.
+- At the start of each task, inspect `git worktree list --porcelain` for eligible leftovers from PRs merged while their session was absent. When a PR merges while its task session is still present, clean up immediately after the checks pass and the session has finished using the worktree. Run removal from a surviving checkout, not from inside the worktree being removed.
+- `git worktree prune` may run at any time: it removes stale administrative records, not worktree directories or branches. It does not establish that a live worktree is safe to remove.
+
+### Required checks (all must pass)
+
+1. Verify the exact repository and task PR with `gh pr view <PR> --repo <OWNER/REPOSITORY> --json state,headRefOid,headRefName`. Require `state` to be `MERGED`, and verify the PR corresponds to the task branch. A closed PR, missing PR, unavailable `gh`, failed request, or ambiguous association is not sufficient.
+2. Inspect the target with `git status --porcelain --ignored` (use `git -C <path>` when outside it). There must be no uncommitted tracked changes or untracked content. List ignored files individually, including contents of ignored directories (`git ls-files --others --ignored --exclude-standard`), and establish that every ignored artifact can be regenerated before proceeding. Unknown, private, or non-regenerable ignored content must be preserved and blocks cleanup; do not assume an ignored directory is disposable. Do not stash, reset, clean, or discard content to make a worktree qualify.
+3. Read the local branch HEAD and confirm it matches the worktree HEAD. Require either exact equality with the verified PR's `headRefOid`, or that HEAD is an ancestor of `origin/<default-branch>` using `git merge-base --is-ancestor <HEAD> origin/<default-branch>`. For the ancestry check, verify origin's repository and actual default branch and fetch it successfully first; never rely on a stale tracking ref or assume the default branch is main. Exact PR head equality also handles squash/rebase merges without depending on commit ancestry. Any additional local commits require the ancestry proof; branch names or a merged PR alone are insufficient.
+
+If any required check fails or evidence is unavailable, preserve the worktree and branch and report the specific reason. Recheck HEAD, status, and session use immediately before removal; if anything changed, stop and re-evaluate rather than using earlier evidence.
+
+### Least destructive removal
+
+After all checks pass, use `git worktree remove <path>` without `--force`, then `git branch -d <branch>`. If worktree removal fails, preserve the branch and report the failure; do not escalate to forced removal or direct directory deletion.
+
+Only if exact equality with `headRefOid` passed and `git branch -d` refuses because squash merging left the branch unrecognized as merged may the Agent use `git branch -D <branch>`. Before this fallback, verify the branch still has that exact HEAD and is not checked out in another worktree. Other deletion failures, a refusal caused by a rebase merge, or ancestry-only evidence do not authorize `-D`; preserve the branch and report why. Report the resources removed and any retained resources with their reasons.
+
 ## Decide by purpose, not by path or producer
 
 Track durable assets needed to understand, reproduce, operate, or maintain the shared project, subject to sensitivity and license review. Being generated, hidden, underscore-prefixed, installed by an Agent, or located in an `output` directory is not a reason by itself to exclude a file.

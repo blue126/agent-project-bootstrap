@@ -10,6 +10,10 @@ empty_target="${test_root}/empty"
 
 test -f "${empty_target}/AGENTS.md"
 test -f "${empty_target}/CLAUDE.md"
+# The installed entry point must resolve to the complete lifecycle policy.
+cmp "${repo_root}/policies/git.md" "${empty_target}/.agent/policies/git.md"
+grep -Fq '[Task worktree lifecycle](.agent/policies/git.md#task-worktree-lifecycle)' "${empty_target}/AGENTS.md"
+grep -Fxq '## Task worktree lifecycle' "${empty_target}/.agent/policies/git.md"
 test -f "${empty_target}/.agent/policies/workflow-selection.md"
 grep -q '^schema_version: 5$' "${empty_target}/.agent/bootstrap.yml"
 grep -q '^workflow_id: github-workflow$' "${empty_target}/.agent/bootstrap.yml"

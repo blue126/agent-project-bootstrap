@@ -83,7 +83,7 @@ Rollback 变更本身是 governance-sensitive，必须显式人工批准。紧�
 - Review/validation artifacts 使用有限 retention；debug/model artifacts 更短并 redacted。
 - 保留 PR、review、commit、checks、repair decisions 与必要 bot comments。
 
-不提供 local cleanup CLI/daemon/schedule，不枚举或删除本地 worktree、branch、sandbox。Codex、Claude、OpenCode 等 agent 按自身生命周期管理本地资源。
+Governance 不提供 local cleanup CLI/daemon/schedule，不枚举或删除本地 worktree、branch、sandbox。Codex、Claude、OpenCode 等 Agent 按 [Task worktree lifecycle](../../../policies/git.md#task-worktree-lifecycle) 管理自建任务 worktree 和本地分支；运行时自带生命周期的 worktree 仍由运行时管理。这是 Agent 的行为规则，与不提供本地 cleanup 工具的边界不冲突，不扩大 remote cleanup 的权限，也不授权 merge。
 
 ## 6. Rollout evidence dashboard
 

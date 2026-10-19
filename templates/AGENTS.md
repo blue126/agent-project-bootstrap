@@ -18,6 +18,8 @@ When `origin/main` exists, it is the eventual code authority. Do not assume an `
 
 Never develop, commit, or push directly on `main` or `master`. Use a purpose-specific branch and verify changes before publishing.
 
+Follow [Task worktree lifecycle](.agent/policies/git.md#task-worktree-lifecycle) for Agent-created task worktrees and local branches: inspect leftovers at task start and clean up after merge only when every check passes. Merge requires explicit user authorization; never force-push or discard user work. Preserve resources when checks fail, and leave runtime-managed worktrees to their runtime.
+
 ## Workflow mode
 
 Read `.agent/bootstrap.yml` and preserve existing project instructions. Known workflow modes are `none`, `github-workflow`, `superpowers`, and `bmad`. Workflow execution is opt-in and mutually exclusive: never run more than one workflow for the same task.

@@ -18,7 +18,8 @@ Agent policy、GitHub `origin/main`、branch/worktree 和 Pull Request 工作流
 - 只读检查现有 Agent 文件、Git 状态、remote、默认分支、worktree、CI 和验证命令。
 - 增量合并现有 `AGENTS.md`、`CLAUDE.md` 和项目规则，禁止覆盖或削弱原有约束。
 - 允许选择或创建与项目目录同名的 GitHub repository；OWNER 必须经过验证。
-- 使用独立 branch/worktree 提交 Draft PR；Agent 不得 merge、force push 或清理用户改动。
+- 使用独立 branch/worktree 提交 Draft PR；本次 adoption 不授权 Agent merge、force push 或清理用户改动。合并后的自建任务 worktree/本地分支遵循 [Task worktree lifecycle](policies/git.md#task-worktree-lifecycle)，失败则保留。
+- 迁移旧的 `delete branches or worktrees` 绝对禁令时，单独展示替换差异并让用户确认；生成器托管块必须修改生成源或通过刷新更新。
 - 将部署、发布和其他有副作用的 CI 与 PR validation 分开处理。
 
 ### Non-goals

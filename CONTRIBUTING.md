@@ -6,6 +6,7 @@
 
 - 先阅读 `AGENTS.md`；它是跨 Agent 的项目规则。
 - 从远端默认分支创建独立 branch/worktree，不直接修改默认分支。
+- Agent 不得未经用户授权 merge，不得 force push 或清理用户改动。任务开始时检查遗留 worktree，PR 合并后按 [Task worktree lifecycle](policies/git.md#task-worktree-lifecycle) 验证并清理 Agent 自建任务 worktree 和本地分支；全部条件满足后无需逐次询问。
 - 保持 public core 技术栈无关；项目专属 validation 放在 consumer adapter。
 - 新第三方内容必须记录 source、immutable ref、license、copyright 和本地修改。
 - 不提交 secret、个人资料、内部 URL、consumer 配置、对话转录或持久 memory。
