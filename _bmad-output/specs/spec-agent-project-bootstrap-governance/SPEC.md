@@ -186,7 +186,9 @@ GitHub repository 创建、App 安装、secrets、Ruleset、auto-merge 与 visib
 
 Merge 后删除远端 head branch；新 SHA 取消 obsolete workflow runs；artifacts 采用有限 retention；PR/review/commit/gate/必要评论保留为审计链。
 
-**Success signal:** remote cleanup fixtures 通过；本地 branch/worktree/sandbox 未被访问或删除。
+Agent 按 [Task worktree lifecycle](../../../policies/git.md#task-worktree-lifecycle) 管理自己创建的任务 worktree 和本地分支；运行时自带生命周期的 worktree 仍由运行时管理。这是 Agent 行为规则，与 governance 不提供本地 cleanup CLI/daemon/schedule、不访问或删除本地资源的边界不冲突，也不授权 merge。
+
+**Success signal:** remote cleanup fixtures 通过；本地 branch/worktree/sandbox 未被 remote cleanup 访问或删除。
 
 ### CAP-018 — Sanitized public release
 
@@ -219,7 +221,7 @@ Merge 后删除远端 head branch；新 SHA 取消 obsolete workflow runs；arti
 
 - 不在 public core 实现任何项目技术栈 validator。
 - 不承诺 AI reviewer 取代 deterministic validation 或人工架构判断。
-- 不提供本地 cleanup CLI、daemon、schedule，不删除本地 worktree/branch/sandbox。
+- Governance 不提供本地 cleanup CLI、daemon、schedule，不删除本地 worktree/branch/sandbox；Agent 的任务资源管理另遵循 [Task worktree lifecycle](../../../policies/git.md#task-worktree-lifecycle)。
 - 不在本规范阶段执行 repository rename、public repo 创建、visibility、Apps、secrets、Rulesets、auto-merge、commit、push 或 PR。
 - 不为无许可证内容取得或推定再分发授权。
 - 不建立第二个 governance runtime repository。

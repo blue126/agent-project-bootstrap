@@ -61,6 +61,7 @@
 5. 检查当前 branch、detached HEAD、working tree、index、已有 worktree、所有 remote、远端默认分支、`origin/main`、`origin/master` 和当前 upstream。
 6. 检查现有 CI、构建清单、README 和 Agent 文件中记录的 test、lint、typecheck、build 命令。
 7. 区分无副作用 validation 与 deploy、publish、apply、release、镜像推送等操作。
+8. 检查 `AGENTS.md`、`CLAUDE.md` 及其生成源是否仍有 `Agents must never merge PRs, force-push, delete branches or worktrees …` 或等价的绝对清理禁令，记录所在文件、托管块和权威源，按第四阶段的独立确认项提出迁移。
 
 先输出预检摘要和项目分类，再实施迁移。
 
@@ -149,12 +150,23 @@
 默认允许修改：
 
 - 根目录 `AGENTS.md`
+- 经下述独立确认的 `.agent/policies/git.md` 生命周期政策及规则生成源
 - 已存在的根目录 `CLAUDE.md`
 - 必要的独立 PR validation workflow
 - 与默认分支名称直接相关的少量配置或文档
 - 确有必要且不存在同类工具时的 `scripts/agent-start`
 
 开始编辑前列出拟修改文件。需要扩大范围时停止并请求授权。
+
+### 旧 worktree 禁令迁移（单独确认项）
+
+适用于 mcpgateway 这类由早期模板初始化的项目。若发现旧禁令，单独展示原文和精确替换差异，请用户确认将其中 `delete branches or worktrees` 改为引用 [Task worktree lifecycle](../policies/git.md#task-worktree-lifecycle)。保留禁止未经授权 merge、force push 和清理用户改动的约束；本次 adoption 不授权 merge。不得把此项混入一般迁移授权，未确认时保留旧规则并报告待办，不执行清理。
+
+目标项目应引用 `.agent/policies/git.md#task-worktree-lifecycle`。同时确认目标政策已含新章节；缺失时把引入新章节的差异列入同一确认项，保留其余项目定制内容，不留下悬空引用。已 bootstrap 的项目可在独立迁移 worktree 中、确认更新范围后运行工具的 `scripts/bootstrap.sh --target <MIGRATION_WORKTREE> --update`，更新仍匹配记录哈希的托管文件；不得把用户原 checkout 作为更新目标。有冲突则展示差异并人工合并，不用 `--force` 覆盖。Update 不代替本项确认，也不自动迁移自定义禁令。
+
+若禁令位于自动生成的托管块（例如 `bmad:context`），定位并修改生成源头或在生成器刷新时更新，再验证输出；不要只改块里的那一行，否则下次刷新会恢复。生成源不明或无法更新时，保留并报告阻塞，不声称迁移完成。
+
+在独立迁移 branch/worktree 中应用已确认差异，将该确认项及来源/刷新方式写入 Draft PR。新规则生效后，任务开始时和 PR 合并后才按全部检查判断是否清理，无需每次再询问；任一检查失败均保留并说明原因。
 
 ### AGENTS.md
 
@@ -176,7 +188,8 @@
 - 每个任务从最新远端默认分支创建独立 branch/worktree
 - 开工前检查 branch、dirty state、upstream 和 worktree 冲突
 - 完成顺序：validate → commit → push branch → Draft PR
-- Agent 不得 merge、force push、删除 branch/worktree 或清理用户改动
+- 本次 adoption 不授权 Agent merge；不得 force push 或清理用户改动
+- Agent 自建任务 worktree/本地分支合并后的清理遵循已采用的 `Task worktree lifecycle`，不满足条件则保留；用户资源、其他运行中会话和运行时托管 worktree 不在清理范围
 
 ### CLAUDE.md
 
@@ -199,14 +212,14 @@
 1. 从确认过的远端基线创建唯一迁移 branch/worktree。
 2. branch 或 worktree 名称冲突时选择新的无冲突名称；不得删除旧对象。
 3. 只修改已声明文件。
-4. 检查最终 diff，确认无业务代码变化、凭据、个人数据、无关格式化、托管内容覆盖、安全规则放宽或 CI 外部副作用。
+4. 检查最终 diff，确认无业务代码变化、凭据、个人数据、无关格式化、托管内容覆盖、未经单独确认的安全规则放宽或 CI 外部副作用。
 5. 只运行已确认安全且无需安装依赖的验证命令。
 6. 清楚报告未运行检查及原因。
 7. 如果项目规则要求提交前确认，必须再次询问。
 8. 获得所需授权后，commit 到迁移分支、正常 push，并创建 Draft PR。
 9. 创建 Draft PR 后停止。
 
-不得 merge PR，不得删除 branch/worktree，不得修改用户原 checkout。
+本次交付停在 Draft PR，不得 merge PR，不得修改用户原 checkout。以后 PR 已合并且项目已采用新规则时，按 `Task worktree lifecycle` 清理自建任务 worktree/本地分支；这不授权删除迁移中遇到的未知旧对象。
 
 ## 最终报告
 
@@ -218,6 +231,7 @@
 - 远端和默认分支证据
 - 原有 Agent/CI 配置
 - 冲突及保留方式
+- 旧 worktree 禁令迁移的独立确认结果、政策引用和生成源/刷新方式；未完成则列为待办
 - 修改文件
 - 验证结果
 - Draft PR URL

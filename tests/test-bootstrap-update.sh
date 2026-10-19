@@ -193,4 +193,44 @@ echo "- Drifted." >> "${templates}/policies/core.md"
 output="$("${templates}/scripts/bootstrap.sh" --target "${legacy}" --update)"
 grep -q 'Left alone' <<<"${output}"
 
+# Legacy worktree bans need explicit adoption; update only refreshes unchanged files.
+cp "${templates}/policies/git.md" "${test_root}/current-git-policy.md"
+cp "${templates}/templates/AGENTS.md" "${test_root}/current-agents.md"
+python3 - "${templates}" <<'PY_LEGACY'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+p = root / "policies/git.md"
+text = p.read_text()
+start = text.index("## Task worktree lifecycle")
+end = text.index("## Decide by purpose", start)
+p.write_text(text[:start] + text[end:])
+p = root / "templates/AGENTS.md"
+text = p.read_text()
+p.write_text("\n".join(line for line in text.split("\n") if not line.startswith("Follow [Task worktree lifecycle]")))
+PY_LEGACY
+for kind in untouched customized; do
+  legacy_target="${test_root}/legacy-worktree-${kind}"
+  "${templates}/scripts/bootstrap.sh" --target "${legacy_target}" --workflow none \
+    --skip-skills --skip-understand-anything >/dev/null
+done
+legacy_custom="${test_root}/legacy-worktree-customized"
+cat >> "${legacy_custom}/AGENTS.md" <<'EOF_LEGACY'
+<!-- bmad:context -->
+Agents must never merge PRs, force-push, delete branches or worktrees.
+<!-- /bmad:context -->
+EOF_LEGACY
+printf '\nLocal policy requiring migration confirmation.\n' >> "${legacy_custom}/.agent/policies/git.md"
+cp "${legacy_custom}/AGENTS.md" "${test_root}/legacy-agents-before.md"
+cp "${legacy_custom}/.agent/policies/git.md" "${test_root}/legacy-policy-before.md"
+cp "${test_root}/current-git-policy.md" "${templates}/policies/git.md"
+cp "${test_root}/current-agents.md" "${templates}/templates/AGENTS.md"
+"${templates}/scripts/bootstrap.sh" --target "${test_root}/legacy-worktree-untouched" --update >/dev/null
+cmp "${templates}/policies/git.md" "${test_root}/legacy-worktree-untouched/.agent/policies/git.md"
+grep -Fq '.agent/policies/git.md#task-worktree-lifecycle' "${test_root}/legacy-worktree-untouched/AGENTS.md"
+output="$("${templates}/scripts/bootstrap.sh" --target "${legacy_custom}" --update)"
+grep -q 'Left alone' <<<"${output}"
+cmp "${test_root}/legacy-agents-before.md" "${legacy_custom}/AGENTS.md"
+cmp "${test_root}/legacy-policy-before.md" "${legacy_custom}/.agent/policies/git.md"
+
 echo "bootstrap update tests passed"

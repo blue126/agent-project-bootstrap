@@ -107,4 +107,56 @@ grep -Fq 'ui_install_briefing' "${repo_root}/scripts/onboard.sh"
 grep -Fq 'ui_install_briefing' "${repo_root}/scripts/lib/onboarding-ui.sh"
 grep -Fq 'governance_reviewer' "${repo_root}/scripts/lib/onboarding-project.py"
 
+# Worktree cleanup is a prose contract, not an executable local cleanup tool.
+python3 - "${repo_root}" <<'PY_POLICY'
+from pathlib import Path
+import re
+import sys
+
+root = Path(sys.argv[1])
+policy = (root / "policies/git.md").read_text()
+section = policy.split("## Task worktree lifecycle\n", 1)[1].split("\n## ", 1)[0]
+guards = {
+    "authorization": ["without asking for permission each time", "merge still requires explicit user authorization"],
+    "ownership": ["created by an Agent for an identified task", "a branch name or directory name alone is not proof"],
+    "exclusions": ["primary checkout", "user-created worktrees or branches", "another running session", "or remote branches", "runtime-managed lifecycle", ".claude/worktrees/"],
+    "timing": ["At the start of each task", "clean up immediately after the checks pass", "from a surviving checkout"],
+    "merged PR": ["Required checks (all must pass)", "gh pr view <PR> --repo <OWNER/REPOSITORY>", "state,headRefOid,headRefName", "`state` to be `MERGED`"],
+    "contents": ["git status --porcelain --ignored", "no uncommitted tracked changes or untracked content", "git ls-files --others --ignored --exclude-standard", "every ignored artifact can be regenerated", "non-regenerable ignored content must be preserved and blocks cleanup"],
+    "delivered HEAD": ["matches the worktree HEAD", "exact equality with the verified PR's `headRefOid`", "git merge-base --is-ancestor <HEAD> origin/<default-branch>", "fetch it successfully first"],
+    "failure": ["If any required check fails or evidence is unavailable, preserve the worktree and branch", "Recheck HEAD, status, and session use immediately before removal"],
+    "removal": ["`git worktree remove <path>` without `--force`", "then `git branch -d <branch>`", "If worktree removal fails, preserve the branch"],
+    "squash exception": ["Only if exact equality with `headRefOid` passed", "refuses because squash merging", "`git branch -D <branch>`", "still has that exact HEAD", "not checked out in another worktree", "ancestry-only evidence do not authorize `-D`"],
+    "prune": ["`git worktree prune` may run at any time", "stale administrative records, not worktree directories or branches"],
+}
+for label, phrases in guards.items():
+    for phrase in phrases:
+        assert phrase in section, f"Missing worktree {label} guard: {phrase}"
+
+# Every consumer-facing reference must resolve to the one canonical section.
+for file in ["templates/AGENTS.md", "CONTRIBUTING.md", "BACKLOG.md",
+             "prompts/adopt-github-workflow.md",
+             "_bmad-output/specs/spec-agent-project-bootstrap-governance/SPEC.md",
+             "_bmad-output/specs/spec-agent-project-bootstrap-governance/rollout-and-rollback.md"]:
+    source = root / file
+    text = source.read_text()
+    links = re.findall(r"\[Task worktree lifecycle\]\(([^)]+)#task-worktree-lifecycle\)", text)
+    assert links, f"Missing lifecycle reference: {file}"
+    for link in links:
+        target = root / "policies/git.md" if file == "templates/AGENTS.md" else source.parent / link
+        if file == "templates/AGENTS.md":
+            assert link == ".agent/policies/git.md"
+        assert target.resolve() == (root / "policies/git.md").resolve(), (file, link)
+
+prompt = (root / "prompts/adopt-github-workflow.md").read_text()
+for phrase in ["delete branches or worktrees", "单独展示原文和精确替换差异", "未确认时保留旧规则",
+               "bmad:context", "不要只改块里的那一行", "生成源不明或无法更新时", "不留下悬空引用"]:
+    assert phrase in prompt, f"Missing legacy migration guard: {phrase}"
+for obsolete in ["Agent 不得 merge、force push、删除 branch/worktree", "不得 merge PR，不得删除 branch/worktree"]:
+    assert obsolete not in prompt, f"Absolute cleanup ban returned: {obsolete}"
+for file in ["SPEC.md", "rollout-and-rollback.md"]:
+    text = (root / "_bmad-output/specs/spec-agent-project-bootstrap-governance" / file).read_text()
+    assert "不提供" in text and "cleanup CLI" in text and "不冲突" in text
+PY_POLICY
+
 echo "policy text tests passed"
